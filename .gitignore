@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/ # has the fusion utils
 lib64/
 parts/
 sdist/
@@ -29,7 +29,7 @@ MANIFEST
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
+# *.manifest # used for addin names
 *.spec
 
 # Installer logs

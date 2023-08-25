@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"b64a1444-afa0-430e-b921-ecef87550bdc",
+	"author":	"EppicJR",
+	"description":	{
+		"":	"A small set of QoL improvments fro your Fusion 360 workflow"
+	},
+	"version":	"",
+	"runOnStartup":	true,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
