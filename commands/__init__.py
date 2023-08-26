@@ -1,7 +1,9 @@
 from .updateDocSettings import entry as updateDocSettings
+from .cleanChamfer import entry as cleanChamfer
 
 commands = [
-    updateDocSettings
+    updateDocSettings,
+    cleanChamfer
 ]
 
 def start():
