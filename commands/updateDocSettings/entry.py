@@ -26,5 +26,5 @@ def update_doc_settings(args: adsk.core.DocumentEventArgs):
     if  eventArgs.document.dataFile.versions.count == 1 and eventArgs.document.objectType == "adsk::fusion::FusionDocument":
         design = adsk.fusion.FusionDocument.cast(eventArgs.document).design
         design.designType = adsk.fusion.DesignTypes.ParametricDesignType
-        design.fusionUnitsManager.defaultLengthUnits = 'in'
+        design.fusionUnitsManager.distanceDisplayUnits = adsk.fusion.DistanceUnits.InchDistanceUnits
 
