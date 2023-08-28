@@ -1,10 +1,9 @@
-import json
+#  Copyright 2023 by Ian Rist
+
 import adsk.core, adsk.fusion
 import os
 from ...lib import fusion360utils as futil
 from ... import config
-from datetime import datetime
-import random
 from typing import List
 
 app = adsk.core.Application.get()
@@ -26,7 +25,6 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 # they are not released and garbage collected.
 local_handlers = []
 
-# Executed when add-in is run.
 def start():
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
     futil.add_handler(cmd_def.commandCreated, command_created)

@@ -17,5 +17,11 @@ DEBUG = True
 ADDIN_NAME = os.path.basename(os.path.dirname(__file__))
 COMPANY_NAME = 'GTF'
 
-# Palettes
-sample_palette_id = f'{COMPANY_NAME}_{ADDIN_NAME}_palette_id'
+# Tabs
+design_tab_id = f'{ADDIN_NAME}_design_tab'
+design_tab_name = f'{ADDIN_NAME}'
+
+# Panels
+tools_panel_id = f'{ADDIN_NAME}_tools_panel'
+tools_panel_name = 'Tools'
+tools_panel_after = ''
