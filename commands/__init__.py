@@ -2,11 +2,13 @@ from .updateDocSettings import entry as updateDocSettings
 from .cleanChamfer import entry as cleanChamfer
 from .genPanels import entry as genPanels
 from .addHolder import entry as addHolder
+from .settings import entry as settings
 
 commands = [
     updateDocSettings,
     cleanChamfer,
-    addHolder
+    addHolder,
+    settings
 ]
 
 def start():
