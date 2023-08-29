@@ -1,3 +1,5 @@
+#  Copyright 2023 by Ian Rist
+
 import json
 import adsk.core, adsk.fusion, adsk.cam, traceback
 import os
