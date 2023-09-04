@@ -89,6 +89,8 @@ def input_changed_handler(args: adsk.core.InputChangedEventArgs):
         setting_key = changed_input.id
 
         # Retrieve the module based on the parent (the tab) of the changed input
+        if changed_input.parentCommandInput is None: # sometimes this is none for no good reason, Valve pls fix
+            return
         module_name = changed_input.parentCommandInput.id
 
         # Load the existing settings for the module

@@ -4,6 +4,7 @@ import adsk.core, adsk.fusion
 import os
 from ...lib import fusion360utils as futil
 from ... import config
+from ... import shared_state
 from typing import List
 
 app = adsk.core.Application.get()
@@ -20,6 +21,21 @@ PANEL_ID = 'SolidModifyPanel'
 COMMAND_BESIDE_ID = 'FusionChamferCommand'
 
 ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', '')
+
+DEFAULT_SETTINGS = {
+    "settings": {
+        "option_checkbox": {
+            "type": "checkbox",
+            "label": "Sew by Default",
+            "default": False
+        }
+    }
+}
+
+# Initialize the settings on first use
+if not shared_state.load_settings(CMD_ID):
+    shared_state.save_settings(CMD_ID, DEFAULT_SETTINGS)
+
 
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
@@ -48,10 +64,12 @@ def stop():
 
 def command_created(args: adsk.core.CommandCreatedEventArgs):
     # General logging for debug.
+    settings = shared_state.load_settings(CMD_ID)
     futil.log(f'{CMD_NAME} Command Created Event')
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
-    futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
+    # futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
     futil.add_handler(args.command.executePreview, command_preview, local_handlers=local_handlers)
+    futil.add_handler(args.command.preSelect, command_preselect, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
     inputs = args.command.commandInputs
@@ -64,7 +82,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # We need to give the user the option to wither create just a patch or splice it back into the model.
     # To do this we will create a radio group with two options.
-    sew_option = inputs.addBoolValueInput('sew_mode', 'Sew into Solid', True, '', True)
+    sew_option = inputs.addBoolValueInput('sew_mode', 'Sew into Solid', True, '', settings["option_checkbox"]["default"])
 
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug
@@ -75,13 +93,28 @@ def command_execute(args: adsk.core.CommandEventArgs):
 # This function will be called when the command needs to compute a new preview in the graphics window
 def command_preview(args: adsk.core.CommandEventArgs):
     inputs = args.command.commandInputs
-    patch_faces(inputs.itemById('chain'), inputs.itemById('sew_mode').value)
+    patch_faces(inputs.itemById('chain'), False)
+
+def command_preselect(args: adsk.core.SelectionEventArgs):
+    if args.activeInput.id == 'chain':
+        # if there are already faces selected then we have to make sure that the new selection is on the same body
+        # first if there are no faces selected then we will allow the selection
+        if args.activeInput.selectionCount == 0:
+            args.isSelectable = True
+        elif args.selection.entity is None:
+            pass
+        elif args.activeInput.selection(0).entity is None:
+            pass
+        elif args.activeInput.selection(0).entity.body == args.selection.entity.body:
+            args.isSelectable = True
+        else:
+            args.isSelectable = False
 
 # This function will be called when the user changes anything in the command dialog
-def command_input_changed(args: adsk.core.InputChangedEventArgs):
-    changed_input = args.input
-    inputs = args.inputs
-    futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
+# def command_input_changed(args: adsk.core.InputChangedEventArgs):
+#     changed_input = args.input
+#     inputs = args.inputs
+#     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
 
 def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
     tangent_faces = face_chain_finder(selections)
@@ -89,7 +122,9 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
     product = adsk.fusion.Design.cast(app.activeProduct)
     active_comp = product.activeComponent
     patches = active_comp.features.patchFeatures
+    body: adsk.fusion.BRepBody = selections.selection(0).entity.body
     firstTLN: adsk.fusion.TimelineObject = None
+    stitch_entities = adsk.core.ObjectCollection.create()
     faces_to_delete = []
     facess = []
     for i in tangent_faces:
@@ -102,30 +137,60 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
             firstTLN = patch.timelineObject
         secondTLN = patch.timelineObject
         # If we are going to sew the patch into the model then we need to add it to the list of bodies to be deleted
+        stitch_entities.add(patch.bodies.item(0))
         if sew:
             for j in range(len(faces)):
                 faces_to_delete.append(faces[j].entityToken)
     
     # if we are not going to sew then we are done
     if sew:
-        pass
-    if len(tangent_faces) > 1 or sew:
+        # we know that all the faces are on the same body so we can just
+        # unstitch the body, get the parts of the unstitched body we want, and then delete the faces that are selected
+        # and then sew the body back together with the patch faces
+        
+        # now we will unstitch the body, by creating a unstitch feature
+        unstitch_features = active_comp.features.unstitchFeatures
+        unstitch_entities = adsk.core.ObjectCollection.create()
+        for i in range(len(faces_to_delete)):
+            ent_list = active_comp.parentDesign.findEntityByToken(faces_to_delete[i])
+            unstitch_entities.add(ent_list[0])
+        unstitch = unstitch_features.add(unstitch_entities, False)
+        for i in range(unstitch.bodies.count):
+            # if this body has and faces in the list of faces to delete then we will not add it to the new body
+            if unstitch.bodies.item(i).faces.item(0).entityToken in faces_to_delete:
+                pass
+            else:
+                stitch_entities.add(unstitch.bodies.item(i))
+        # now we will delete the faces that are selected
+        delete_features = active_comp.features.deleteFaceFeatures
+        delete_entities = adsk.core.ObjectCollection.create()
+        for i in range(len(faces_to_delete)):
+            ent_list = active_comp.parentDesign.findEntityByToken(faces_to_delete[i])
+            delete_entities.add(ent_list[0])
+        delete = delete_features.add(delete_entities)
+        # now we will sew the body back together
+        stitch_features = active_comp.features.stitchFeatures
+        stitch_input = stitch_features.createInput(stitch_entities, adsk.core.ValueInput.createByString('0.1 mm'))
+        stitch = stitch_features.add(stitch_input)
+        secondTLN = stitch.timelineObject
+        
+    if firstTLN.index != secondTLN.index:
         tgs: adsk.fusion.TimelineGroups = product.timeline.timelineGroups
         tg = tgs.add(firstTLN.index, secondTLN.index)
 
 
 # We must consolidate the faces into groups based on the chains of faces that are tangent to each other.
-def face_chain_finder(faces: adsk.core.SelectionCommandInput):
+def face_chain_finder(selections: adsk.core.SelectionCommandInput):
     # first we will create a list of all the entity tokens for the faces
     face_tokens = []
     tangent_faces = []
-    if faces.selectionCount == 1:
-        return [[faces.selection(0).entity.entityToken]], [[0]]
-    for i in range(faces.selectionCount):
-        face_tokens.append(faces.selection(i).entity.entityToken)
+    if selections.selectionCount == 1:
+        return [[0]]
+    for i in range(selections.selectionCount):
+        face_tokens.append(selections.selection(i).entity.entityToken)
         # Then we will create a list of all the faces that are tangent to the given face
         tan_faces = []
-        tan_face = faces.selection(i).entity.tangentiallyConnectedFaces
+        tan_face = selections.selection(i).entity.tangentiallyConnectedFaces
         for j in range(tan_face.count):
             tan_faces.append(tan_face.item(j).entityToken)
         tangent_faces.append(tan_faces)
