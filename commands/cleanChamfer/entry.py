@@ -68,6 +68,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     futil.log(f'{CMD_NAME} Command Created Event')
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
     # futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
+    futil.add_handler(args.command.validateInputs, command_validateinputs, local_handlers=local_handlers)
     futil.add_handler(args.command.executePreview, command_preview, local_handlers=local_handlers)
     futil.add_handler(args.command.preSelect, command_preselect, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
@@ -77,7 +78,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     face_chain_input = inputs.addSelectionInput('chain', 'Selected Faces', 'Select the chamfered Faces to be patched.')
     # We need to allow only planar, cylindrical, and conical faces because those are the only ones
     # that will be from a valid chamfer and can be correctly patched.
-    face_chain_input.selectionFilters = ['PlanarFaces', 'CylindricalFaces', 'ConicalFaces']
+    face_chain_input.selectionFilters = ['PlanarFaces', 'CylindricalFaces', 'ConicalFaces', 'SplineFaces']
     face_chain_input.setSelectionLimits(1, 0)
 
     # We need to give the user the option to wither create just a patch or splice it back into the model.
@@ -94,6 +95,31 @@ def command_execute(args: adsk.core.CommandEventArgs):
 def command_preview(args: adsk.core.CommandEventArgs):
     inputs = args.command.commandInputs
     patch_faces(inputs.itemById('chain'), False)
+
+def command_validateinputs(args: adsk.core.ValidateInputsEventArgs):
+    # The only thing we are doing here is making sure that they are only selecting one body
+    chain_selection: adsk.core.SelectionCommandInput = args.inputs.itemById('chain')
+    if chain_selection.selectionCount > 1:
+        # we will make a dict of the bodies that are selected with the number of faces that are selected on that body
+        body_dict = {}
+        for i in range(chain_selection.selectionCount):
+            entityToken = chain_selection.selection(i).entity.body.entityToken
+            if entityToken in body_dict:
+                body_dict[entityToken] += 1
+            else:
+                body_dict[entityToken] = 1
+        # then we will check to see if there is more than one body in the dict
+        if len(body_dict) > 1:
+            # get all the faces we want, and then add them to the selection
+            # APIDUMB: There is no way to remove a selection from a selection command input but you can add to it and clear it
+            max_body = max(body_dict, key=body_dict.get)
+            good_faces = []
+            for i in range(chain_selection.selectionCount):
+                if chain_selection.selection(i).entity.body.entityToken == max_body:
+                    good_faces.append(chain_selection.selection(i).entity)
+            chain_selection.clearSelection()
+            for i in range(len(good_faces)):
+                chain_selection.addSelection(good_faces[i])
 
 def command_preselect(args: adsk.core.SelectionEventArgs):
     if args.activeInput.id == 'chain':
@@ -122,14 +148,16 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
     product = adsk.fusion.Design.cast(app.activeProduct)
     active_comp = product.activeComponent
     patches = active_comp.features.patchFeatures
-    body: adsk.fusion.BRepBody = selections.selection(0).entity.body
     firstTLN: adsk.fusion.TimelineObject = None
     stitch_entities = adsk.core.ObjectCollection.create()
+    unstitch_entities = adsk.core.ObjectCollection.create()
     faces_to_delete = []
     facess = []
     for i in tangent_faces:
         facess.append(get_faces(i, selections))
     for faces in facess:
+        if len(faces) == 1:
+            continue
         loop = loop_finder(faces)
         patch_input = patches.createInput(loop, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
         patch = patches.add(patch_input)
@@ -140,6 +168,7 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         stitch_entities.add(patch.bodies.item(0))
         if sew:
             for j in range(len(faces)):
+                unstitch_entities.add(faces[j])
                 faces_to_delete.append(faces[j].entityToken)
     
     # if we are not going to sew then we are done
@@ -150,10 +179,6 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         
         # now we will unstitch the body, by creating a unstitch feature
         unstitch_features = active_comp.features.unstitchFeatures
-        unstitch_entities = adsk.core.ObjectCollection.create()
-        for i in range(len(faces_to_delete)):
-            ent_list = active_comp.parentDesign.findEntityByToken(faces_to_delete[i])
-            unstitch_entities.add(ent_list[0])
         unstitch = unstitch_features.add(unstitch_entities, False)
         for i in range(unstitch.bodies.count):
             # if this body has and faces in the list of faces to delete then we will not add it to the new body
@@ -174,7 +199,7 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         stitch = stitch_features.add(stitch_input)
         secondTLN = stitch.timelineObject
         
-    if firstTLN.index != secondTLN.index:
+    if firstTLN is not None and firstTLN.index != secondTLN.index:
         tgs: adsk.fusion.TimelineGroups = product.timeline.timelineGroups
         tg = tgs.add(firstTLN.index, secondTLN.index)
 
@@ -190,10 +215,19 @@ def face_chain_finder(selections: adsk.core.SelectionCommandInput):
         face_tokens.append(selections.selection(i).entity.entityToken)
         # Then we will create a list of all the faces that are tangent to the given face
         tan_faces = []
-        tan_face = selections.selection(i).entity.tangentiallyConnectedFaces
+        tan_face: adsk.fusion.BRepFaces = selections.selection(i).entity.tangentiallyConnectedFaces
         for j in range(tan_face.count):
             tan_faces.append(tan_face.item(j).entityToken)
-        tangent_faces.append(tan_faces)
+        neighbor_faces = []
+        neighbor_edges: adsk.fusion.BRepEdges = selections.selection(i).entity.edges
+        for j in range(neighbor_edges.count):
+            edge_faces = neighbor_edges.item(j).faces
+            for k in range(edge_faces.count):
+                if edge_faces.item(k).entityToken != face_tokens[i]:
+                    neighbor_faces.append(edge_faces.item(k).entityToken)
+        # now we take the intersection of the two lists to get the faces that are tangent and neighbor faces
+        valid_faces = list(set(tan_faces).intersection(set(neighbor_faces)))
+        tangent_faces.append(valid_faces)
     
     # Then we will create a list of all the unique lists of tangent faces
     unique_tangent_chains = [[face_tokens[0]]]
@@ -227,6 +261,15 @@ def get_faces(face_tokens: List[int], input: adsk.core.SelectionCommandInput) ->
         faces.append(input.selection(i).entity)
     return faces
 
+def add_to_vertex_dict(vertex_dict, edge: adsk.fusion.BRepEdge):
+    """Add the edge to the dictionary based on its start and end vertices."""
+    for vertex in [edge.startVertex, edge.endVertex]:
+        token = vertex.entityToken
+        if token in vertex_dict:
+            vertex_dict[token].append(edge)
+        else:
+            vertex_dict[token] = [edge]
+
 # Find the loop around the edge of a set of faces
 def loop_finder(faces: List[adsk.fusion.BRepFace]) -> adsk.fusion.Path:
     # first we will find all the boundary edges
@@ -243,30 +286,33 @@ def loop_finder(faces: List[adsk.fusion.BRepFace]) -> adsk.fusion.Path:
     # order the edges into a loop
     # we will start with the first edge and then find the edge that is connected to it
     # then we will find the edge that is connected to that edge and so on until we reach the first edge again
-    ordered_edges_id: List[adsk.fusion.BRepEdge] = []
-    ordered_edges_id.append(boundary_edges_id[0])
-    boundary_edges_id.pop(0)
-    while len(boundary_edges_id) > 0:
-        beg = len(ordered_edges_id)
-        for i in range(len(boundary_edges_id)):
-            if boundary_edges_id[i].startVertex.entityToken == ordered_edges_id[-1].endVertex.entityToken:
-                ordered_edges_id.append(boundary_edges_id[i])
-                boundary_edges_id.pop(i)
+
+    # Construct vertex dictionary
+    vertex_dict = {}
+    for edge in boundary_edges_id:
+        add_to_vertex_dict(vertex_dict, edge)
+
+    ordered_edges_id = [boundary_edges_id.pop(0)]
+
+    while boundary_edges_id:
+        last_edge = ordered_edges_id[-1]
+        matched_edge = None
+
+        for token in [last_edge.startVertex.entityToken, last_edge.endVertex.entityToken]:
+            possible_edges = vertex_dict.get(token, [])
+            for edge in possible_edges:
+                if edge != last_edge and edge in boundary_edges_id:  # Ensure we're not re-adding the same edge
+                    matched_edge = edge
+                    break
+
+            if matched_edge:
                 break
-            elif boundary_edges_id[i].endVertex.entityToken == ordered_edges_id[-1].endVertex.entityToken:
-                ordered_edges_id.append(boundary_edges_id[i])
-                boundary_edges_id.pop(i)
-                break
-            elif boundary_edges_id[i].startVertex.entityToken == ordered_edges_id[-1].startVertex.entityToken:
-                ordered_edges_id.append(boundary_edges_id[i])
-                boundary_edges_id.pop(i)
-                break
-            elif boundary_edges_id[i].endVertex.entityToken == ordered_edges_id[-1].startVertex.entityToken:
-                ordered_edges_id.append(boundary_edges_id[i])
-                boundary_edges_id.pop(i)
-                break
-        if beg == len(ordered_edges_id):
-            futil.log('something went wrong')
+
+        if matched_edge:
+            ordered_edges_id.append(matched_edge)
+            boundary_edges_id.remove(matched_edge)
+        else:
+            futil.log(f'Failed to find a matching edge for the last edge. {len(faces)}')
             break
 
     # fires we will make a ObjectCollection of the boundary edges
