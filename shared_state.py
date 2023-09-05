@@ -34,9 +34,18 @@ def load_settings(module_name):
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, 'r') as file:
             all_settings = json.load(file)
-    
-    module_data = all_settings.get(module_name, {})
-    return module_data.get("settings", {})
+    return all_settings.get(module_name, {})
+
+def load_settings_init(module_name, default_settings):
+    all_settings = {}
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, 'r') as file:
+            all_settings = json.load(file)
+    if module_name not in all_settings.keys():
+        all_settings[module_name] = default_settings
+    else:
+        merge_settings(default_settings, all_settings[module_name])
+    save_settings(module_name, all_settings[module_name])
 
 def save_settings(module_name, settings):
     all_settings = {}
@@ -54,3 +63,14 @@ def get_all_module_settings():
         with open(SETTINGS_FILE, 'r') as file:
             return json.load(file)
     return {}
+
+def merge_settings(default_settings, user_settings):
+    # Iterate over default settings
+    for key, value in default_settings.items():
+        # If the setting is not in user_settings, add it
+        if key not in user_settings:
+            user_settings[key] = value
+        # If the value itself is a dictionary, then recurse
+        elif isinstance(value, dict) and isinstance(user_settings[key], dict):
+            merge_settings(value, user_settings[key])
+    return user_settings

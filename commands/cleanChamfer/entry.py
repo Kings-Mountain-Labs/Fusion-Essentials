@@ -5,7 +5,9 @@ import os
 from ...lib import fusion360utils as futil
 from ... import config
 from ... import shared_state
+from ...timer import Timer, format_timer
 from typing import List
+import math
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -23,12 +25,15 @@ COMMAND_BESIDE_ID = 'FusionChamferCommand'
 ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', '')
 
 DEFAULT_SETTINGS = {
-    "settings": {
-        "option_checkbox": {
-            "type": "checkbox",
-            "label": "Sew by Default",
-            "default": False
-        }
+    "option_checkbox": {
+        "type": "checkbox",
+        "label": "Sew by Default",
+        "default": False
+    },
+    "permissive": {
+        "type": "checkbox",
+        "label": "Permissive Tangency Mode",
+        "default": False
     }
 }
 
@@ -36,6 +41,7 @@ DEFAULT_SETTINGS = {
 if not shared_state.load_settings(CMD_ID):
     shared_state.save_settings(CMD_ID, DEFAULT_SETTINGS)
 
+timer = Timer()
 
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
@@ -84,6 +90,8 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     # We need to give the user the option to wither create just a patch or splice it back into the model.
     # To do this we will create a radio group with two options.
     sew_option = inputs.addBoolValueInput('sew_mode', 'Sew into Solid', True, '', settings["option_checkbox"]["default"])
+
+    permissive_input = inputs.addBoolValueInput('permissive', 'Permissive Mode', True, '', settings["permissive"]["default"])
 
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug
@@ -143,6 +151,7 @@ def command_preselect(args: adsk.core.SelectionEventArgs):
 #     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
 
 def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
+    timer.mark('find_chains')
     tangent_faces = face_chain_finder(selections)
     # first we will find the loop around the boundary of the faces
     product = adsk.fusion.Design.cast(app.activeProduct)
@@ -153,13 +162,18 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
     unstitch_entities = adsk.core.ObjectCollection.create()
     faces_to_delete = []
     facess = []
-    for i in tangent_faces:
-        facess.append(get_faces(i, selections))
-    for faces in facess:
+    timer.mark('get_faces')
+    for i, tf in enumerate(tangent_faces):
+        timer.mark(f'get_faces:{i}')
+        facess.append(get_faces(tf, selections))
+    timer.mark('patch_faces')
+    for i, faces in enumerate(facess):
+        timer.mark(f'patch_faces:{i}')
         if len(faces) == 1:
             continue
-        loop = loop_finder(faces)
+        loop, interior_edges = loop_finder(faces)
         patch_input = patches.createInput(loop, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+        patch_input.interiorRailsAndPoints = interior_edges
         patch = patches.add(patch_input)
         if firstTLN is None:
             firstTLN = patch.timelineObject
@@ -178,8 +192,10 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         # and then sew the body back together with the patch faces
         
         # now we will unstitch the body, by creating a unstitch feature
+        timer.mark('unstitch')
         unstitch_features = active_comp.features.unstitchFeatures
         unstitch = unstitch_features.add(unstitch_entities, False)
+        timer.mark('find_good_faces')
         for i in range(unstitch.bodies.count):
             # if this body has and faces in the list of faces to delete then we will not add it to the new body
             if unstitch.bodies.item(i).faces.item(0).entityToken in faces_to_delete:
@@ -187,6 +203,7 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
             else:
                 stitch_entities.add(unstitch.bodies.item(i))
         # now we will delete the faces that are selected
+        timer.mark('delete_faces')
         delete_features = active_comp.features.deleteFaceFeatures
         delete_entities = adsk.core.ObjectCollection.create()
         for i in range(len(faces_to_delete)):
@@ -194,44 +211,88 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
             delete_entities.add(ent_list[0])
         delete = delete_features.add(delete_entities)
         # now we will sew the body back together
+        timer.mark('stitch')
         stitch_features = active_comp.features.stitchFeatures
         stitch_input = stitch_features.createInput(stitch_entities, adsk.core.ValueInput.createByString('0.1 mm'))
         stitch = stitch_features.add(stitch_input)
         secondTLN = stitch.timelineObject
         
     if firstTLN is not None and firstTLN.index != secondTLN.index:
+        timer.mark('timeline')
         tgs: adsk.fusion.TimelineGroups = product.timeline.timelineGroups
         tg = tgs.add(firstTLN.index, secondTLN.index)
 
+    timing = timer.finish()
+    if config.DEBUG:
+        futil.log(format_timer(timing))
+
+def are_vectors_parallel(vector1: adsk.core.Vector3D, vector2: adsk.core.Vector3D, tol: float = 1e-6) -> bool:
+    if abs(vector1.angleTo(vector2)) < tol:
+        return True
+    else:
+        return False
+
+def are_faces_tangent(face1: adsk.fusion.BRepFace, face2: adsk.fusion.BRepFace, edge: adsk.fusion.BRepEdge, permissive: bool = False) -> bool:
+    # we are going to select a set of 3d points on the edge and determine the normal on each of the faces at the points
+    # then we will compare and see of the normals are parallel within a certain tolerance
+    # first we will get the 3d points on the edge
+    points: List(adsk.core.Point3D) = []
+    parameters = []
+    pts = 10
+    length = edge.length
+    _, start_geom, _ = edge.evaluator.getParameterExtents()
+    for i in range(pts):
+        _, param = edge.evaluator.getParameterAtLength(start_geom, length*i/pts)
+        parameters.append(param)
+    good, points = edge.evaluator.getPointsAtParameters(parameters)
+    # now we will get the normals on the faces at the points
+    good1, normals1 = face1.evaluator.getNormalsAtPoints(points)
+    good2, normals2 = face2.evaluator.getNormalsAtPoints(points)
+    if not good1 or not good2 or not good:
+        return False
+    # now we will compare the normals
+    tol = 1e-6
+    if permissive:
+        tol = 1e-2
+    for i in range(pts):
+        if not are_vectors_parallel(normals1[i], normals2[i], tol=tol):
+            futil.log(f'Normals are not parallel at point {i}')
+            futil.log(f'Normal 1: {normals1[i].asArray()}')
+            futil.log(f'Normal 2: {normals2[i].asArray()}')
+            futil.log(f'Angle: {math.degrees(normals1[i].angleTo(normals2[i]))}\t{normals1[i].angleTo(normals2[i])}')
+            return False
+    return True
 
 # We must consolidate the faces into groups based on the chains of faces that are tangent to each other.
 def face_chain_finder(selections: adsk.core.SelectionCommandInput):
     # first we will create a list of all the entity tokens for the faces
     face_tokens = []
     tangent_faces = []
-    if selections.selectionCount == 1:
+    if selections.selectionCount <= 1:
         return [[0]]
+    
+    permissive = selections.parentCommand.commandInputs.itemById('permissive').value
+
     for i in range(selections.selectionCount):
+        timer.mark(f'find_chains:nextedge{i}')
         face_tokens.append(selections.selection(i).entity.entityToken)
         # Then we will create a list of all the faces that are tangent to the given face
-        tan_faces = []
-        tan_face: adsk.fusion.BRepFaces = selections.selection(i).entity.tangentiallyConnectedFaces
-        for j in range(tan_face.count):
-            tan_faces.append(tan_face.item(j).entityToken)
-        neighbor_faces = []
+        valid_faces = []
+        timer.mark(f'find_chains:nextedge{i}_neighbor')
         neighbor_edges: adsk.fusion.BRepEdges = selections.selection(i).entity.edges
         for j in range(neighbor_edges.count):
             edge_faces = neighbor_edges.item(j).faces
             for k in range(edge_faces.count):
                 if edge_faces.item(k).entityToken != face_tokens[i]:
-                    neighbor_faces.append(edge_faces.item(k).entityToken)
+                    if are_faces_tangent(selections.selection(i).entity, edge_faces.item(k), neighbor_edges.item(j), permissive=permissive):
+                        valid_faces.append(edge_faces.item(k).entityToken)
         # now we take the intersection of the two lists to get the faces that are tangent and neighbor faces
-        valid_faces = list(set(tan_faces).intersection(set(neighbor_faces)))
         tangent_faces.append(valid_faces)
     
     # Then we will create a list of all the unique lists of tangent faces
     unique_tangent_chains = [[face_tokens[0]]]
     for i in range(1, len(tangent_faces)):
+        timer.mark(f'find_chains:unique_chains{i}')
         b = -1
         ind_to_pop = []
         for j in range(len(unique_tangent_chains)):
@@ -249,10 +310,10 @@ def face_chain_finder(selections: adsk.core.SelectionCommandInput):
     # also make a list of the index of the faces
     utc_inds = []
     for i in range(len(unique_tangent_chains)):
+        timer.mark(f'find_chains:utc_inds{i}')
         utc_inds.append([])
         for j in range(len(unique_tangent_chains[i])):
             utc_inds[i].append(face_tokens.index(unique_tangent_chains[i][j]))
-
     return utc_inds
 
 def get_faces(face_tokens: List[int], input: adsk.core.SelectionCommandInput) -> List[adsk.fusion.BRepFace]:
@@ -276,10 +337,12 @@ def loop_finder(faces: List[adsk.fusion.BRepFace]) -> adsk.fusion.Path:
     # this can be done by adding every edge to a list and then removing the edges that are shared by two faces
     # the remaining edges will be the boundary edges
     boundary_edges_id: List[adsk.fusion.BRepEdge] = []
+    interior_edges_id: List[adsk.fusion.BRepEdge] = []
     for i in range(len(faces)):
         for j in range(faces[i].edges.count):
             if faces[i].edges.item(j) in boundary_edges_id:
                 boundary_edges_id.remove(faces[i].edges.item(j))
+                interior_edges_id.append(faces[i].edges.item(j))
             else:
                 boundary_edges_id.append(faces[i].edges.item(j))
 
@@ -293,26 +356,22 @@ def loop_finder(faces: List[adsk.fusion.BRepFace]) -> adsk.fusion.Path:
         add_to_vertex_dict(vertex_dict, edge)
 
     ordered_edges_id = [boundary_edges_id.pop(0)]
-
     while boundary_edges_id:
         last_edge = ordered_edges_id[-1]
         matched_edge = None
-
         for token in [last_edge.startVertex.entityToken, last_edge.endVertex.entityToken]:
             possible_edges = vertex_dict.get(token, [])
             for edge in possible_edges:
                 if edge != last_edge and edge in boundary_edges_id:  # Ensure we're not re-adding the same edge
                     matched_edge = edge
                     break
-
             if matched_edge:
                 break
-
         if matched_edge:
             ordered_edges_id.append(matched_edge)
             boundary_edges_id.remove(matched_edge)
         else:
-            futil.log(f'Failed to find a matching edge for the last edge. {len(faces)}')
+            futil.log(f'Failed to find a matching edge for the last edge.')
             break
 
     # fires we will make a ObjectCollection of the boundary edges
@@ -321,7 +380,11 @@ def loop_finder(faces: List[adsk.fusion.BRepFace]) -> adsk.fusion.Path:
         boundary_edges.add(ordered_edges_id[i])
     # now we will find the loop around the boundary edges
     path = adsk.fusion.Path.create(boundary_edges, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
-    return path
+    # make a object collection of the interior edges
+    interior_edges = adsk.core.ObjectCollection.create()
+    for i in range(len(interior_edges_id)):
+        interior_edges.add(interior_edges_id[i])
+    return path, interior_edges
 
 
 # This event handler is called when the command terminates.

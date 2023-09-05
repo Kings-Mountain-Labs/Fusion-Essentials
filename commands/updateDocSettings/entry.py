@@ -14,18 +14,16 @@ CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_updateDocSettings'
 local_handlers = []
 
 DEFAULT_SETTINGS = {
-    "settings": {
-        "option_checkbox": {
-            "type": "checkbox",
-            "label": "Automatically change units",
-            "default": True
-        },
-        "units": {
-            "type": "dropdown",
-            "label": "Units",
-            "options": ["in", "mm", "ft", "m", "cm"],
-            "default": "in"
-        }
+    "option_checkbox": {
+        "type": "checkbox",
+        "label": "Automatically change units",
+        "default": True
+    },
+    "units": {
+        "type": "dropdown",
+        "label": "Units",
+        "options": ["in", "mm", "ft", "m", "cm"],
+        "default": "in"
     }
 }
 

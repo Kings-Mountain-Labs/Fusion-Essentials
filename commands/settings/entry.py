@@ -65,7 +65,7 @@ def command_created(args):
         for module_name, module_data in all_module_settings.items():
             tabCmdInput = inputs.addTabCommandInput(module_name, module_name[len(MODULE_PREFIX):])
 
-            for setting_key, setting_metadata in module_data['settings'].items():
+            for setting_key, setting_metadata in module_data.items():
                 if setting_metadata["type"] == "button" or setting_metadata["type"] == "checkbox":
                     tabCmdInput.children.addBoolValueInput(setting_key, setting_metadata["label"], setting_metadata["type"] == "checkbox", "", setting_metadata["default"])
 
