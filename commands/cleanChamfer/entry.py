@@ -6,7 +6,7 @@ from ...lib import fusion360utils as futil
 from ... import config
 from ... import shared_state
 from ...timer import Timer, format_timer
-from typing import List
+from typing import List, Dict
 import math
 
 app = adsk.core.Application.get()
@@ -156,7 +156,7 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
     # first we will find the loop around the boundary of the faces
     product = adsk.fusion.Design.cast(app.activeProduct)
     active_comp = product.activeComponent
-    patches = active_comp.features.patchFeatures
+    features = active_comp.features
     firstTLN: adsk.fusion.TimelineObject = None
     stitch_entities = adsk.core.ObjectCollection.create()
     unstitch_entities = adsk.core.ObjectCollection.create()
@@ -171,15 +171,12 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         timer.mark(f'patch_faces:{i}')
         if len(faces) == 1:
             continue
-        loop, interior_edges = loop_finder(faces)
-        patch_input = patches.createInput(loop, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
-        patch_input.interiorRailsAndPoints = interior_edges
-        patch = patches.add(patch_input)
+        body, tln1, tln2 = patcher(faces, features)
         if firstTLN is None:
-            firstTLN = patch.timelineObject
-        secondTLN = patch.timelineObject
+            firstTLN = tln1
+        secondTLN = tln2
         # If we are going to sew the patch into the model then we need to add it to the list of bodies to be deleted
-        stitch_entities.add(patch.bodies.item(0))
+        stitch_entities.add(body)
         if sew:
             for j in range(len(faces)):
                 unstitch_entities.add(faces[j])
@@ -232,6 +229,8 @@ def are_vectors_parallel(vector1: adsk.core.Vector3D, vector2: adsk.core.Vector3
     else:
         return False
 
+# APIDUMB: There is no way to determine if two faces are tangent to each other, you can get all tangent faces and see if there is a intersection in the list but that is not very efficient
+# like it takes like 0.3 sec per face or more to get the tangent faces, which makes the command unresponsive for a long time
 def are_faces_tangent(face1: adsk.fusion.BRepFace, face2: adsk.fusion.BRepFace, edge: adsk.fusion.BRepEdge, permissive: bool = False) -> bool:
     # we are going to select a set of 3d points on the edge and determine the normal on each of the faces at the points
     # then we will compare and see of the normals are parallel within a certain tolerance
@@ -256,10 +255,10 @@ def are_faces_tangent(face1: adsk.fusion.BRepFace, face2: adsk.fusion.BRepFace, 
         tol = 1e-2
     for i in range(pts):
         if not are_vectors_parallel(normals1[i], normals2[i], tol=tol):
-            futil.log(f'Normals are not parallel at point {i}')
-            futil.log(f'Normal 1: {normals1[i].asArray()}')
-            futil.log(f'Normal 2: {normals2[i].asArray()}')
-            futil.log(f'Angle: {math.degrees(normals1[i].angleTo(normals2[i]))}\t{normals1[i].angleTo(normals2[i])}')
+            # futil.log(f'Normals are not parallel at point {i}')
+            # futil.log(f'Normal 1: {normals1[i].asArray()}')
+            # futil.log(f'Normal 2: {normals2[i].asArray()}')
+            # futil.log(f'Angle: {math.degrees(normals1[i].angleTo(normals2[i]))}\t{normals1[i].angleTo(normals2[i])}')
             return False
     return True
 
@@ -331,60 +330,129 @@ def add_to_vertex_dict(vertex_dict, edge: adsk.fusion.BRepEdge):
         else:
             vertex_dict[token] = [edge]
 
-# Find the loop around the edge of a set of faces
-def loop_finder(faces: List[adsk.fusion.BRepFace]) -> adsk.fusion.Path:
-    # first we will find all the boundary edges
-    # this can be done by adding every edge to a list and then removing the edges that are shared by two faces
-    # the remaining edges will be the boundary edges
-    boundary_edges_id: List[adsk.fusion.BRepEdge] = []
-    interior_edges_id: List[adsk.fusion.BRepEdge] = []
-    for i in range(len(faces)):
-        for j in range(faces[i].edges.count):
-            if faces[i].edges.item(j) in boundary_edges_id:
-                boundary_edges_id.remove(faces[i].edges.item(j))
-                interior_edges_id.append(faces[i].edges.item(j))
-            else:
-                boundary_edges_id.append(faces[i].edges.item(j))
+def add_to_edge_dict(edge_dict, edict, face: adsk.fusion.BRepFace):
+    """Add the face to the dictionary based on its edges."""
+    for edge in face.edges:
+        token = edge.entityToken
+        edict[token] = edge
+        if token in edge_dict:
+            edge_dict[token].append(face)
+        else:
+            edge_dict[token] = [face]
 
-    # order the edges into a loop
-    # we will start with the first edge and then find the edge that is connected to it
-    # then we will find the edge that is connected to that edge and so on until we reach the first edge again
-
+def find_looped_edges(edges: List[adsk.fusion.BRepEdge]) -> (List[adsk.fusion.BRepEdge], List[adsk.fusion.BRepEdge]):
     # Construct vertex dictionary
     vertex_dict = {}
-    for edge in boundary_edges_id:
+    for edge in edges:
         add_to_vertex_dict(vertex_dict, edge)
 
-    ordered_edges_id = [boundary_edges_id.pop(0)]
-    while boundary_edges_id:
+    ordered_edges_id = [edges.pop(0)]
+    while edges:
         last_edge = ordered_edges_id[-1]
         matched_edge = None
         for token in [last_edge.startVertex.entityToken, last_edge.endVertex.entityToken]:
             possible_edges = vertex_dict.get(token, [])
             for edge in possible_edges:
-                if edge != last_edge and edge in boundary_edges_id:  # Ensure we're not re-adding the same edge
+                if edge != last_edge and edge in edges:  # Ensure we're not re-adding the same edge
                     matched_edge = edge
                     break
             if matched_edge:
                 break
         if matched_edge:
             ordered_edges_id.append(matched_edge)
-            boundary_edges_id.remove(matched_edge)
+            edges.remove(matched_edge)
         else:
             futil.log(f'Failed to find a matching edge for the last edge.')
             break
+    return ordered_edges_id, edges
+
+def are_edges_connected(edge1: adsk.fusion.BRepEdge, edge2: adsk.fusion.BRepEdge) -> bool:
+    if edge1.startVertex.entityToken == edge2.startVertex.entityToken or edge1.startVertex.entityToken == edge2.endVertex.entityToken or edge1.endVertex.entityToken == edge2.startVertex.entityToken or edge1.endVertex.entityToken == edge2.endVertex.entityToken:
+        return True
+    else:
+        return False
+
+# Find the loop around the edge of a set of faces
+def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -> (adsk.fusion.BRepBody, adsk.fusion.TimelineObject, adsk.fusion.TimelineObject):
+    edge_dict = {}
+    edict = {}
+    for face in faces:
+        add_to_edge_dict(edge_dict, edict, face)
+    the_faces = faces.copy()
+    ordered_faces = [the_faces.pop(0)]
+    while the_faces:
+        last_face = ordered_faces[-1]
+        matched_face = None
+        for edge in last_face.edges:
+            possible_faces = edge_dict.get(edge.entityToken, [])
+            for face in possible_faces:
+                if face != last_face and face in the_faces:  # Ensure we're not re-adding the same face
+                    matched_face = face
+                    break
+            if matched_face:
+                break
+        if matched_face:
+            ordered_faces.append(matched_face)
+            the_faces.remove(matched_face)
+        else:
+            futil.log(f'Failed to find a matching face for the last face. Something is very wrong.')
+            break
+    faces = ordered_faces
+
+    interior_edges_id: Dict[adsk.fusion.BRepEdge] = {}
+    exterior_edges_id: Dict[adsk.fusion.BRepEdge] = {}
+    # all of the edged with more than one face attached to them are interior edges
+    for key, val in edge_dict.items():
+        if len(val) > 1:
+            interior_edges_id[key] = edict[key]
+        else:
+            exterior_edges_id[key] = edict[key]
+
+    # if the faces make a loop then we will need to make two loops and use a loft instead of a patch
+    # we will check to see if the first and last faces are tangent to each other
+    lofts = features.loftFeatures
+    loft_input = lofts.createInput(adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+
+    boundary_edges_id_1: List[adsk.fusion.BRepEdge] = []
+    boundary_edges_id_2: List[adsk.fusion.BRepEdge] = []
+    # we will iterate through the faces and add the edges to the boundary edges list until we reach the first face again
+    for i in range(len(faces)):
+        for j in range(faces[i].edges.count):
+            if faces[i].edges.item(j).entityToken in exterior_edges_id.keys():
+                # first we have to exit out if one of the corners of the line does not touch a corner of another face
+                
+                if len(boundary_edges_id_1) == 0:
+                    boundary_edges_id_1.append(faces[i].edges.item(j))
+                elif are_edges_connected(boundary_edges_id_1[-1], faces[i].edges.item(j)):
+                    boundary_edges_id_1.append(faces[i].edges.item(j))
+                elif len(boundary_edges_id_2) == 0:
+                    boundary_edges_id_2.append(faces[i].edges.item(j))
+                elif are_edges_connected(boundary_edges_id_2[-1], faces[i].edges.item(j)):
+                    boundary_edges_id_2.append(faces[i].edges.item(j))
+                else:
+                    futil.log(f'Failed to find a matching edge for the last edge.')
+    futil.log(f'Number of boundary edges 1: {len(boundary_edges_id_1)}')
+    futil.log(f'Number of boundary edges 2: {len(boundary_edges_id_2)}')
 
     # fires we will make a ObjectCollection of the boundary edges
-    boundary_edges = adsk.core.ObjectCollection.create()
-    for i in range(len(ordered_edges_id)):
-        boundary_edges.add(ordered_edges_id[i])
+    boundary_edges_1 = adsk.core.ObjectCollection.create()
+    for i in boundary_edges_id_1:
+        boundary_edges_1.add(i)
     # now we will find the loop around the boundary edges
-    path = adsk.fusion.Path.create(boundary_edges, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
-    # make a object collection of the interior edges
-    interior_edges = adsk.core.ObjectCollection.create()
-    for i in range(len(interior_edges_id)):
-        interior_edges.add(interior_edges_id[i])
-    return path, interior_edges
+    path_1 = adsk.fusion.Path.create(boundary_edges_1, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
+    boundary_edges_2 = adsk.core.ObjectCollection.create()
+    for i in boundary_edges_id_2:
+        boundary_edges_2.add(i)
+    # now we will find the loop around the boundary edges
+    path_2 = adsk.fusion.Path.create(boundary_edges_2, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
+    # now we will loft the two paths
+    loft_input.loftSections.add(path_1)
+    loft_input.loftSections.add(path_2)
+    for edge in interior_edges_id.values():
+        loft_input.centerLineOrRails.addRail(edge)
+        
+    loft = lofts.add(loft_input)
+    return loft.bodies.item(0), loft.timelineObject, loft.timelineObject
 
 
 # This event handler is called when the command terminates.
