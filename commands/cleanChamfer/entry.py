@@ -348,6 +348,32 @@ def are_edges_connected(edge1: adsk.fusion.BRepEdge, edge2: adsk.fusion.BRepEdge
     else:
         return False
 
+def find_farthest_edge(face: adsk.fusion.BRepFace, next_face: adsk.fusion.BRepFace) -> adsk.fusion.BRepEdge:
+    # first we must figure out what edge or edges are shared between the two faces
+    shared_edges: List[adsk.fusion.BRepEdge] = []
+    for i in range(face.edges.count):
+        faces = face.edges.item(i).faces
+        for j in range(faces.count):
+            if faces.item(j).entityToken == next_face.entityToken:
+                shared_edges.append(face.edges.item(i))
+    # now we will find the edge that is farthest away from the shared edge
+    farthest_edge = None
+    farthest_dist = 0
+    for i in range(face.edges.count):
+        if face.edges.item(i) not in shared_edges:
+            dists = []
+            for j in range(len(shared_edges)):
+                dists.append(face.edges.item(i).startVertex.geometry.distanceTo(shared_edges[j].startVertex.geometry))
+                dists.append(face.edges.item(i).startVertex.geometry.distanceTo(shared_edges[j].endVertex.geometry))
+                dists.append(face.edges.item(i).endVertex.geometry.distanceTo(shared_edges[j].startVertex.geometry))
+                dists.append(face.edges.item(i).endVertex.geometry.distanceTo(shared_edges[j].endVertex.geometry))
+            avg_dist = sum(dists)/len(dists)
+            if avg_dist > farthest_dist:
+                farthest_edge = face.edges.item(i)
+                farthest_dist = avg_dist
+    return farthest_edge
+
+
 # Find the loop around the edge of a set of faces
 def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -> (adsk.fusion.BRepBody, adsk.fusion.TimelineObject, adsk.fusion.TimelineObject):
     edge_dict = {}
@@ -401,27 +427,63 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
 
     boundary_edges_id_1: List[adsk.fusion.BRepEdge] = []
     boundary_edges_id_2: List[adsk.fusion.BRepEdge] = []
+    # for the first face we want to seed the two boundary edges lists with the two edges that touch the first shared edge
+    second_face_set = set([faces[1].vertices.item(j).entityToken for j in range(faces[1].vertices.count)])
+    for i in range(faces[0].edges.count):
+        if set([faces[0].edges.item(i).startVertex.entityToken, faces[0].edges.item(i).endVertex.entityToken]).intersection(second_face_set).__len__() > 0 and faces[0].edges.item(i).entityToken in exterior_edges_id.keys():
+            if len(boundary_edges_id_1) == 0:
+                boundary_edges_id_1.append(faces[0].edges.item(i))
+            elif len(boundary_edges_id_2) == 0:
+                boundary_edges_id_2.append(faces[0].edges.item(i))
+            else:
+                futil.log(f'Found too many seed edges for the first face.')
+
+    # first we will find the edge that is farthest away from the shared edge for the first face
+    farthest_edge = find_farthest_edge(faces[0], faces[1])
+    # then we will find the edge that is farthest away from the shared edge for the last face
+    farthest_edge2 = find_farthest_edge(faces[-1], faces[-2])
+
     # we will iterate through the faces and add the edges to the boundary edges list until we reach the first face again
+    is_closed_set = (set([faces[0].vertices.item(i).entityToken for i in range(faces[0].vertices.count)]).intersection(set([faces[-1].vertices.item(i).entityToken for i in range(faces[-1].vertices.count)])).__len__() < 2 or len(faces) == 2)
     for i in range(len(faces)):
+        edges_to_place: List[adsk.fusion.BRepFace] = []
         for j in range(faces[i].edges.count):
             if faces[i].edges.item(j).entityToken in exterior_edges_id.keys():
                 # first we have to exit out if one of the corners of the line does not touch a corner of another face
-                if vertex_dict[faces[i].edges.item(j).startVertex.entityToken].__len__() == 1 and vertex_dict[faces[i].edges.item(j).endVertex.entityToken].__len__() == 1:
-                    futil.log(f'found a end edge, adding it to internal edges')
+                if (faces[i].edges.item(j) == farthest_edge or faces[i].edges.item(j) == farthest_edge2) and is_closed_set:
                     interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
                     continue
-                if len(boundary_edges_id_1) == 0:
-                    boundary_edges_id_1.append(faces[i].edges.item(j))
-                elif are_edges_connected(boundary_edges_id_1[-1], faces[i].edges.item(j)):
-                    boundary_edges_id_1.append(faces[i].edges.item(j))
-                elif len(boundary_edges_id_2) == 0:
-                    boundary_edges_id_2.append(faces[i].edges.item(j))
-                elif are_edges_connected(boundary_edges_id_2[-1], faces[i].edges.item(j)):
-                    boundary_edges_id_2.append(faces[i].edges.item(j))
+                if i != 0: # we are going to seed the boundary edges with the first face so we dont want to be deleting those
+                    if faces[i].edges.item(j) in boundary_edges_id_1:
+                        boundary_edges_id_1.remove(faces[i].edges.item(j))
+                        interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
+                        continue
+                    elif faces[i].edges.item(j) in boundary_edges_id_2:
+                        boundary_edges_id_2.remove(faces[i].edges.item(j))
+                        interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
+                        continue
+                elif faces[i].edges.item(j) in boundary_edges_id_1 or faces[i].edges.item(j) in boundary_edges_id_2: # however we do want to skip the seeded edges if we are on the first face
+                    continue
+                edges_to_place.append(faces[i].edges.item(j))
+        while edges_to_place:
+            for edge in edges_to_place:
+                if are_edges_connected(boundary_edges_id_1[-1], edge):
+                    boundary_edges_id_1.append(edge)
+                    edges_to_place.remove(edge)
+                elif are_edges_connected(boundary_edges_id_1[0], edge):
+                    boundary_edges_id_1.insert(0, edge)
+                    edges_to_place.remove(edge)
+                elif are_edges_connected(boundary_edges_id_2[-1], edge):
+                    boundary_edges_id_2.append(edge)
+                    edges_to_place.remove(edge)
+                elif are_edges_connected(boundary_edges_id_2[0], edge):
+                    boundary_edges_id_2.insert(0, edge)
+                    edges_to_place.remove(edge)
                 else:
                     futil.log(f'Failed to find a matching edge for the last edge.')
-    futil.log(f'Number of boundary edges 1: {len(boundary_edges_id_1)}')
-    futil.log(f'Number of boundary edges 2: {len(boundary_edges_id_2)}')
+    
+    # if the face is not a loop then we will have remove one edge from each end of the surface
+    # first we have to find the edge for each of the ending faces that is the farthest away from the edge shared with the next face
 
     # fires we will make a ObjectCollection of the boundary edges
     boundary_edges_1 = adsk.core.ObjectCollection.create()
@@ -439,7 +501,8 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
     loft_input.loftSections.add(path_2)
     for edge in interior_edges_id.values():
         loft_input.centerLineOrRails.addRail(edge)
-        
+    
+    loft_input.isSolid = False
     loft = lofts.add(loft_input)
     return loft.bodies.item(0), loft.timelineObject, loft.timelineObject
 
