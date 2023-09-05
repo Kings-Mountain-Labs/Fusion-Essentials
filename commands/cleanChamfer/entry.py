@@ -237,12 +237,14 @@ def are_faces_tangent(face1: adsk.fusion.BRepFace, face2: adsk.fusion.BRepFace, 
     # first we will get the 3d points on the edge
     points: List(adsk.core.Point3D) = []
     parameters = []
-    pts = 10
+    pts = 11
     length = edge.length
-    _, start_geom, _ = edge.evaluator.getParameterExtents()
+    _, start_geom, end_geom = edge.evaluator.getParameterExtents()
     for i in range(pts):
-        _, param = edge.evaluator.getParameterAtLength(start_geom, length*i/pts)
+        _, param = edge.evaluator.getParameterAtLength(start_geom, length*i/(pts - 1))
         parameters.append(param)
+    parameters[0] += 1e-6
+    parameters[-1] -= 1e-6
     good, points = edge.evaluator.getPointsAtParameters(parameters)
     # now we will get the normals on the faces at the points
     good1, normals1 = face1.evaluator.getNormalsAtPoints(points)
