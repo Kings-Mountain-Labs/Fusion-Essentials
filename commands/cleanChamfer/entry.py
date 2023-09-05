@@ -321,14 +321,14 @@ def get_faces(face_tokens: List[int], input: adsk.core.SelectionCommandInput) ->
         faces.append(input.selection(i).entity)
     return faces
 
-def add_to_vertex_dict(vertex_dict, edge: adsk.fusion.BRepEdge):
+def add_to_vertex_dict(vertex_dict, face: adsk.fusion.BRepFace):
     """Add the edge to the dictionary based on its start and end vertices."""
-    for vertex in [edge.startVertex, edge.endVertex]:
+    for vertex in face.vertices:
         token = vertex.entityToken
         if token in vertex_dict:
-            vertex_dict[token].append(edge)
+            vertex_dict[token].append(face)
         else:
-            vertex_dict[token] = [edge]
+            vertex_dict[token] = [face]
 
 def add_to_edge_dict(edge_dict, edict, face: adsk.fusion.BRepFace):
     """Add the face to the dictionary based on its edges."""
@@ -339,32 +339,6 @@ def add_to_edge_dict(edge_dict, edict, face: adsk.fusion.BRepFace):
             edge_dict[token].append(face)
         else:
             edge_dict[token] = [face]
-
-def find_looped_edges(edges: List[adsk.fusion.BRepEdge]) -> (List[adsk.fusion.BRepEdge], List[adsk.fusion.BRepEdge]):
-    # Construct vertex dictionary
-    vertex_dict = {}
-    for edge in edges:
-        add_to_vertex_dict(vertex_dict, edge)
-
-    ordered_edges_id = [edges.pop(0)]
-    while edges:
-        last_edge = ordered_edges_id[-1]
-        matched_edge = None
-        for token in [last_edge.startVertex.entityToken, last_edge.endVertex.entityToken]:
-            possible_edges = vertex_dict.get(token, [])
-            for edge in possible_edges:
-                if edge != last_edge and edge in edges:  # Ensure we're not re-adding the same edge
-                    matched_edge = edge
-                    break
-            if matched_edge:
-                break
-        if matched_edge:
-            ordered_edges_id.append(matched_edge)
-            edges.remove(matched_edge)
-        else:
-            futil.log(f'Failed to find a matching edge for the last edge.')
-            break
-    return ordered_edges_id, edges
 
 def are_edges_connected(edge1: adsk.fusion.BRepEdge, edge2: adsk.fusion.BRepEdge) -> bool:
     if edge1.startVertex.entityToken == edge2.startVertex.entityToken or edge1.startVertex.entityToken == edge2.endVertex.entityToken or edge1.endVertex.entityToken == edge2.startVertex.entityToken or edge1.endVertex.entityToken == edge2.endVertex.entityToken:
@@ -380,6 +354,7 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
         add_to_edge_dict(edge_dict, edict, face)
     the_faces = faces.copy()
     ordered_faces = [the_faces.pop(0)]
+    we_ok = True
     while the_faces:
         last_face = ordered_faces[-1]
         matched_face = None
@@ -392,8 +367,13 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
             if matched_face:
                 break
         if matched_face:
+            we_ok = True
             ordered_faces.append(matched_face)
             the_faces.remove(matched_face)
+        elif we_ok:
+            # flip ordered faces and try again
+            ordered_faces.reverse()
+            we_ok = False
         else:
             futil.log(f'Failed to find a matching face for the last face. Something is very wrong.')
             break
@@ -413,6 +393,10 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
     lofts = features.loftFeatures
     loft_input = lofts.createInput(adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
 
+    vertex_dict = {}
+    for face in faces:
+        add_to_vertex_dict(vertex_dict, face)
+
     boundary_edges_id_1: List[adsk.fusion.BRepEdge] = []
     boundary_edges_id_2: List[adsk.fusion.BRepEdge] = []
     # we will iterate through the faces and add the edges to the boundary edges list until we reach the first face again
@@ -420,7 +404,10 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
         for j in range(faces[i].edges.count):
             if faces[i].edges.item(j).entityToken in exterior_edges_id.keys():
                 # first we have to exit out if one of the corners of the line does not touch a corner of another face
-                
+                if vertex_dict[faces[i].edges.item(j).startVertex.entityToken].__len__() == 1 and vertex_dict[faces[i].edges.item(j).endVertex.entityToken].__len__() == 1:
+                    futil.log(f'found a end edge, adding it to internal edges')
+                    interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
+                    continue
                 if len(boundary_edges_id_1) == 0:
                     boundary_edges_id_1.append(faces[i].edges.item(j))
                 elif are_edges_connected(boundary_edges_id_1[-1], faces[i].edges.item(j)):
