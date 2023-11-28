@@ -1,5 +1,3 @@
-#  Copyright 2023 by Ian Rist
-
 import adsk.core, adsk.fusion
 from ... import config
 

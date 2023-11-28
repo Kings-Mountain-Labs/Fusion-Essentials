@@ -11,3 +11,19 @@ If you are familiar with git, you can clone the repo into your add-ins folder.
 3. **Automatically Enable Design History** This command will automatically enable design history for for what it perceives to be a newly imported file.
 4. **Automatically Switch Units** This command will automatically switch the units of a newly imported file to the units of the current document.
 5. **Ability to Change Settings** You can enable/disable or change the default units and the settings will persist between sessions. (there is no grantee that they will persist over updates of the add-in, until a 1.0 release is made)
+
+## License
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the
+work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
+additional terms or conditions.

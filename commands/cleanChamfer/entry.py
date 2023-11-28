@@ -1,5 +1,3 @@
-#  Copyright 2023 by Ian Rist
-
 import adsk.core, adsk.fusion
 import os
 from ...lib import fusion360utils as futil
