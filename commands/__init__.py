@@ -1,5 +1,6 @@
 from .updateDocSettings import entry as updateDocSettings
 from .cleanChamfer import entry as cleanChamfer
+from .autoJaws import entry as autoJaws
 from .genPanels import entry as genPanels
 from .addHolder import entry as addHolder
 from .settings import entry as settings
@@ -7,6 +8,7 @@ from .settings import entry as settings
 commands = [
     updateDocSettings,
     cleanChamfer,
+    autoJaws,
     addHolder,
     settings
 ]

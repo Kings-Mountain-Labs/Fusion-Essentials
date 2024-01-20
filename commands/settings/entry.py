@@ -72,7 +72,9 @@ def command_created(args):
                     for option in setting_metadata["options"]:
                         dropdown.listItems.add(option, option == setting_metadata["default"])
 
-                # You can add support for more types as needed
+                elif setting_metadata["type"] == "value": # this use the ValueCommandInput which is for specifying a length
+                    tabCmdInput.children.addValueInput(setting_key, setting_metadata["label"], setting_metadata["units"], adsk.core.ValueInput.createByString(setting_metadata["default"]))
+
 
         futil.add_handler(args.command.inputChanged, input_changed_handler, local_handlers=local_handlers)
 
@@ -103,8 +105,11 @@ def input_changed_handler(args: adsk.core.InputChangedEventArgs):
         elif isinstance(changed_input, adsk.core.BoolValueCommandInput):
             module_settings[setting_key]["default"] = changed_input.value
 
+        elif isinstance(changed_input, adsk.core.ValueCommandInput):
+            module_settings[setting_key]["default"] = changed_input.expression
+
         # Save the modified settings back
-        shared_state.save_settings(module_name, {"settings": module_settings})
+        shared_state.save_settings(module_name, module_settings)
 
     except:
         ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
