@@ -6,6 +6,8 @@ from ... import shared_state
 from ...timer import Timer, format_timer
 from typing import List, Dict
 import math
+from adsk.core import ValueInput, Vector3D, Point3D, Matrix3D, Line3D, DistanceValueCommandInput, AngleValueCommandInput, InputChangedEventArgs
+from adsk.fusion import BRepBody, BRepFace, TemporaryBRepManager
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -61,6 +63,57 @@ if not shared_state.load_settings(CMD_ID):
 
 timer = Timer()
 
+
+class PartDatum:
+    flb_point: Point3D
+    frb_point: Point3D
+    flt_point: Point3D
+    rlb_point: Point3D
+    right_vector: Vector3D
+    top_vector: Vector3D
+    rear_vector: Vector3D
+    theta: float
+    bottom_center: Point3D
+    rotation_matrix: Matrix3D
+
+    def __init__(self, flb_point: Point3D, frb_point: Point3D, flt_point: Point3D, rlb_point: Point3D, theta: float):
+        self.flb_point = flb_point
+        self.frb_point = frb_point
+        self.flt_point = flt_point
+        self.rlb_point = rlb_point
+        self.right_vector = flb_point.vectorTo(frb_point)
+        self.top_vector = flb_point.vectorTo(flt_point)
+        self.rear_vector = flb_point.vectorTo(rlb_point)
+        self.theta = theta
+        self.get_bottom_center_with_transformation()
+
+    def get_bottom_center_with_transformation(self) -> (Point3D, Matrix3D):
+        # this function will return the bottom center point of the part datum with the transformation applied
+        # get the center of the bottom face
+        self.bottom_center = self.flb_point.copy()
+        # APIDUMB: WHY THE FUCK CAN I NOT MULTIPLY A VECTOR BY A SCALAR????
+        half_right_vector = self.right_vector.copy()
+        half_rear_vector = self.rear_vector.copy()
+        half_right_vector.scaleBy(0.5)
+        half_rear_vector.scaleBy(0.5)
+        self.bottom_center.translateBy(half_right_vector)
+        self.bottom_center.translateBy(half_rear_vector)
+        # get the rotation matrix for the datum, this should be the axis normal to the bottom face
+        self.rotation_matrix = Matrix3D.create()
+        self.rotation_matrix.setToRotation(self.top_vector.angleTo(Vector3D.create(0, 0, 1)), self.top_vector.crossProduct(Vector3D.create(0, 0, 1)), self.bottom_center)
+        
+    def get_angular_x_y(self) -> (Vector3D, Vector3D):
+        # rotate the x (right vector) of the bounding back by theta about the top vector
+        x_vector = self.right_vector.copy()
+        y_vector = self.right_vector.copy()
+        x_rotation_matrix = Matrix3D.create()
+        x_rotation_matrix.setToRotation(-self.theta, self.top_vector, self.bottom_center)
+        x_vector.transformBy(x_rotation_matrix)
+        y_rotation_matrix = Matrix3D.create()
+        y_rotation_matrix.setToRotation(-self.theta + math.pi/2, self.top_vector, self.bottom_center)
+        y_vector.transformBy(y_rotation_matrix)
+        return x_vector, y_vector
+
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
 local_handlers = []
@@ -91,444 +144,425 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     settings = shared_state.load_settings(CMD_ID)
     futil.log(f'{CMD_NAME} Command Created Event')
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
-    # futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
-    futil.add_handler(args.command.validateInputs, command_validateinputs, local_handlers=local_handlers)
+    futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
     futil.add_handler(args.command.executePreview, command_preview, local_handlers=local_handlers)
-    futil.add_handler(args.command.preSelect, command_preselect, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
     inputs = args.command.commandInputs
-
-    face_chain_input = inputs.addSelectionInput('chain', 'Select Bottom Face', 'Select the bottom face of the part that the jaws will be offset from')
-    # We need to allow only planar, cylindrical, and conical faces because those are the only ones
-    # that will be from a valid chamfer and can be correctly patched.
-    face_chain_input.selectionFilters = ['PlanarFaces']
-    face_chain_input.setSelectionLimits(1, 1)
 
     part_selection_input = inputs.addSelectionInput('part', 'Select Part', 'Select the part that the jaws will be offset from')
     part_selection_input.selectionFilters = ['SolidBodies']
     part_selection_input.setSelectionLimits(1, 0)
 
-    jaw_thickness_input = inputs.addDistanceValueCommandInput('jaw_thickness', 'Jaw Thickness', adsk.core.ValueInput.createByString(settings["jaw_thickness"]["default"]))
-    jaw_height_input = inputs.addDistanceValueCommandInput('jaw_height', 'Jaw Height', adsk.core.ValueInput.createByString(settings["jaw_height"]["default"]))
-    jaw_offset_input = inputs.addDistanceValueCommandInput('jaw_offset', 'Jaw Offset', adsk.core.ValueInput.createByString(settings["jaw_offset"]["default"]))
-    jaw_end_offset_input = inputs.addDistanceValueCommandInput('jaw_end_offset', 'Jaw End Offset', adsk.core.ValueInput.createByString(settings["jaw_end_offset"]["default"]))
-    jaw_middle_spacing_input = inputs.addDistanceValueCommandInput('jaw_middle_spacing', 'Jaw Middle Spacing', adsk.core.ValueInput.createByString(settings["jaw_middle_spacing"]["default"]))
+    face_chain_input = inputs.addSelectionInput('bottom_face', 'Select Bottom Face', 'Select the bottom face of the part that the jaws will be offset from')
+    # We need to allow only planar, cylindrical, and conical faces because those are the only ones
+    # that will be from a valid chamfer and can be correctly patched.
+    face_chain_input.selectionFilters = ['PlanarFaces']
+    face_chain_input.setSelectionLimits(1, 1)
+
+    jaw_theta_input = inputs.addAngleValueCommandInput('jaw_theta', 'Jaw Angle', ValueInput.createByString("0 deg"))
+    jaw_theta_input.isVisible = False
+
+    jaw_thickness_input = inputs.addDistanceValueCommandInput('jaw_thickness', 'Jaw Thickness', ValueInput.createByString(settings["jaw_thickness"]["default"]))
+    jaw_thickness_input.minimumValue = 0.0
+    jaw_height_input = inputs.addDistanceValueCommandInput('jaw_height', 'Jaw Height', ValueInput.createByString(settings["jaw_height"]["default"]))
+    jaw_height_input.minimumValue = 0.0
+    jaw_offset_input = inputs.addDistanceValueCommandInput('jaw_offset', 'Jaw Offset', ValueInput.createByString(settings["jaw_offset"]["default"]))
+    jaw_end_offset_input = inputs.addDistanceValueCommandInput('jaw_end_offset', 'Jaw End Offset', ValueInput.createByString(settings["jaw_end_offset"]["default"]))
+    jaw_middle_spacing_input = inputs.addDistanceValueCommandInput('jaw_middle_spacing', 'Jaw Middle Spacing', ValueInput.createByString(settings["jaw_middle_spacing"]["default"]))
+    jaw_middle_spacing_input.minimumValue = 0.0
+
+    # Disable them, this makes the manipulator disappear
+    hide_show_distance_inputs(inputs, False)
 
 
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug
     futil.log(f'{CMD_NAME} Command Execute Event')
     inputs = args.command.commandInputs
-    patch_faces(inputs.itemById('chain'), inputs.itemById('sew_mode').value)
+    # get the selected face
+    face = args.command.commandInputs.itemById('bottom_face').selection(0).entity
+    # get the selected parts, and put them in a list
+    parts: List[BRepBody] = []
+    for part_num in range(args.command.commandInputs.itemById('part').selectionCount):
+        parts.append(args.command.commandInputs.itemById('part').selection(part_num).entity)
+    # get the jaw theta
+    theta_input: AngleValueCommandInput = args.command.commandInputs.itemById('jaw_theta')
+    jaw_theta = theta_input.value
+    # get the bounding box
+    bounding_box = generate_bounding_box_with_face(parts, face, jaw_theta)
+    # show the bounding box
+    generate_soft_jaws(args, parts, face, jaw_theta, bounding_box)
 
 # This function will be called when the command needs to compute a new preview in the graphics window
 def command_preview(args: adsk.core.CommandEventArgs):
     inputs = args.command.commandInputs
-    patch_faces(inputs.itemById('chain'), False)
+    # get the selected face
+    face = args.command.commandInputs.itemById('bottom_face').selection(0).entity
+    # get the selected parts, and put them in a list
+    parts: List[BRepBody] = []
+    for part_num in range(args.command.commandInputs.itemById('part').selectionCount):
+        parts.append(args.command.commandInputs.itemById('part').selection(part_num).entity)
+    # get the jaw theta
+    theta_input: AngleValueCommandInput = args.command.commandInputs.itemById('jaw_theta')
+    jaw_theta = theta_input.value
+    # get the bounding box
+    bounding_box = generate_bounding_box_with_face(parts, face, jaw_theta)
+    # show the bounding box
+    show_bounding_box(bounding_box)
+    generate_soft_jaws(args, parts, face, jaw_theta, bounding_box)
 
-def command_validateinputs(args: adsk.core.ValidateInputsEventArgs):
-    # The only thing we are doing here is making sure that they are only selecting one body
-    chain_selection: adsk.core.SelectionCommandInput = args.inputs.itemById('chain')
-    if chain_selection.selectionCount > 1:
-        # we will make a dict of the bodies that are selected with the number of faces that are selected on that body
-        body_dict = {}
-        for i in range(chain_selection.selectionCount):
-            entityToken = chain_selection.selection(i).entity.body.entityToken
-            if entityToken in body_dict:
-                body_dict[entityToken] += 1
-            else:
-                body_dict[entityToken] = 1
-        # then we will check to see if there is more than one body in the dict
-        if len(body_dict) > 1:
-            # get all the faces we want, and then add them to the selection
-            # APIDUMB: There is no way to remove a selection from a selection command input but you can add to it and clear it
-            max_body = max(body_dict, key=body_dict.get)
-            good_faces = []
-            for i in range(chain_selection.selectionCount):
-                if chain_selection.selection(i).entity.body.entityToken == max_body:
-                    good_faces.append(chain_selection.selection(i).entity)
-            chain_selection.clearSelection()
-            for i in range(len(good_faces)):
-                chain_selection.addSelection(good_faces[i])
-
-def command_preselect(args: adsk.core.SelectionEventArgs):
-    if args.activeInput.id == 'chain':
-        # if there are already faces selected then we have to make sure that the new selection is on the same body
-        # first if there are no faces selected then we will allow the selection
-        if args.activeInput.selectionCount == 0:
-            args.isSelectable = True
-        elif args.selection.entity is None:
-            pass
-        elif args.activeInput.selection(0).entity is None:
-            pass
-        elif args.activeInput.selection(0).entity.body == args.selection.entity.body:
-            args.isSelectable = True
-        else:
-            args.isSelectable = False
 
 # This function will be called when the user changes anything in the command dialog
-# def command_input_changed(args: adsk.core.InputChangedEventArgs):
-#     changed_input = args.input
-#     inputs = args.inputs
-#     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
+def command_input_changed(args: InputChangedEventArgs):
+    changed_input = args.input
+    inputs = args.inputs
+    # within the input changed event we want to check if there are valid selections for the part and the face
+    # if there are we shall make the other inputs visible
+    # otherwise we shall hide them
+    # (changed_input.id == 'part' or changed_input.id == 'bottom_face' or changed_input.id == 'jaw_theta')
+    if inputs.itemById('part').selectionCount > 0 and inputs.itemById('bottom_face').selectionCount > 0:
+        inputs.itemById('jaw_theta').isVisible = True
+        hide_show_distance_inputs(inputs, True)
+        face = inputs.itemById('bottom_face').selection(0).entity
+        # get the selected parts, and put them in a list
+        parts: List[BRepBody] = []
+        for part_num in range(inputs.itemById('part').selectionCount):
+            parts.append(inputs.itemById('part').selection(part_num).entity)
+        # get the jaw theta
+        theta_input: AngleValueCommandInput = inputs.itemById('jaw_theta')
+        jaw_theta = theta_input.value
+        # get the bounding box
+        bounding_box = generate_bounding_box_with_face(parts, face, jaw_theta)
+        if changed_input.id != 'jaw_theta':
+            x, y = bounding_box.get_angular_x_y()
+            ret = theta_input.setManipulator(bounding_box.bottom_center, x, y)
+            if not ret:
+                futil.log('Failed to set manipulator for jaw_theta_input')
+        jaw_middle_spacing_input: DistanceValueCommandInput = inputs.itemById('jaw_middle_spacing')
+        jaw_thickness_input: DistanceValueCommandInput = inputs.itemById('jaw_thickness')
+        jaw_end_offset_input: DistanceValueCommandInput = inputs.itemById('jaw_end_offset')
+        jaw_offset_input: DistanceValueCommandInput = inputs.itemById('jaw_offset')
+        jaw_height_input: DistanceValueCommandInput = inputs.itemById('jaw_height')
+        if changed_input.id != 'jaw_middle_spacing':
+            current_expression = jaw_middle_spacing_input.expression
+            # the manipulator position is going to be the center point on the bottom of the bounding box and the direction will be the y vector
+            ret = jaw_middle_spacing_input.setManipulator(bounding_box.bottom_center, bounding_box.rear_vector)
+            # APIDUMB: this is brain dead, why does it try and project the position of the manipulator to the normal of the extension axis????????
+            jaw_middle_spacing_input.expression = current_expression
+            if not ret:
+                futil.log('Failed to set manipulator for jaw_middle_spacing_input')
 
-def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
-    timer.mark('find_chains')
-    tangent_faces = face_chain_finder(selections)
-    # first we will find the loop around the boundary of the faces
-    product = adsk.fusion.Design.cast(app.activeProduct)
-    active_comp = product.activeComponent
-    features = active_comp.features
-    firstTLN: adsk.fusion.TimelineObject = None
-    stitch_entities = adsk.core.ObjectCollection.create()
-    unstitch_entities = adsk.core.ObjectCollection.create()
-    faces_to_delete = []
-    facess = []
-    timer.mark('get_faces')
-    for i, tf in enumerate(tangent_faces):
-        timer.mark(f'get_faces:{i}')
-        facess.append(get_faces(tf, selections))
-    timer.mark('patch_faces')
-    for i, faces in enumerate(facess):
-        timer.mark(f'patch_faces:{i}')
-        if len(faces) == 1:
-            continue
-        body, tln1, tln2 = patcher(faces, features)
-        if firstTLN is None:
-            firstTLN = tln1
-        secondTLN = tln2
-        # If we are going to sew the patch into the model then we need to add it to the list of bodies to be deleted
-        stitch_entities.add(body)
-        if sew:
-            for j in range(len(faces)):
-                unstitch_entities.add(faces[j])
-                faces_to_delete.append(faces[j].entityToken)
-    
-    # if we are not going to sew then we are done
-    if sew:
-        # we know that all the faces are on the same body so we can just
-        # unstitch the body, get the parts of the unstitched body we want, and then delete the faces that are selected
-        # and then sew the body back together with the patch faces
-        
-        # now we will unstitch the body, by creating a unstitch feature
-        timer.mark('unstitch')
-        unstitch_features = active_comp.features.unstitchFeatures
-        unstitch = unstitch_features.add(unstitch_entities, False)
-        timer.mark('find_good_faces')
-        for i in range(unstitch.bodies.count):
-            # if this body has and faces in the list of faces to delete then we will not add it to the new body
-            if unstitch.bodies.item(i).faces.item(0).entityToken in faces_to_delete:
-                pass
-            else:
-                stitch_entities.add(unstitch.bodies.item(i))
-        # now we will delete the faces that are selected
-        timer.mark('delete_faces')
-        delete_features = active_comp.features.deleteFaceFeatures
-        delete_entities = adsk.core.ObjectCollection.create()
-        for i in range(len(faces_to_delete)):
-            ent_list = active_comp.parentDesign.findEntityByToken(faces_to_delete[i])
-            delete_entities.add(ent_list[0])
-        delete = delete_features.add(delete_entities)
-        # now we will sew the body back together
-        timer.mark('stitch')
-        stitch_features = active_comp.features.stitchFeatures
-        stitch_input = stitch_features.createInput(stitch_entities, adsk.core.ValueInput.createByString('0.1 mm'))
-        stitch = stitch_features.add(stitch_input)
-        secondTLN = stitch.timelineObject
-        
-    if firstTLN is not None and firstTLN.index != secondTLN.index:
-        timer.mark('timeline')
-        tgs: adsk.fusion.TimelineGroups = product.timeline.timelineGroups
-        tg = tgs.add(firstTLN.index, secondTLN.index)
+        if changed_input.id != 'jaw_thickness':
+            current_expression = jaw_thickness_input.expression
+            # the manipulator position is going to be the center point on the bottom of the bounding box and the direction will be the y vector
+            manipulator_origin = bounding_box.bottom_center.copy()
+            offset_vector = bounding_box.rear_vector.copy()
+            offset_vector.normalize()
+            offset_vector.scaleBy(jaw_middle_spacing_input.value/2)
+            manipulator_origin.translateBy(offset_vector)
+            ret = jaw_thickness_input.setManipulator(manipulator_origin, bounding_box.rear_vector)
+            jaw_thickness_input.expression = current_expression
+            if not ret:
+                futil.log('Failed to set manipulator for jaw_thickness_input')
 
-    timing = timer.finish()
-    if config.DEBUG:
-        futil.log(format_timer(timing))
+        if changed_input.id != 'jaw_end_offset':
+            current_expression = jaw_end_offset_input.expression
+            manipulator_origin = bounding_box.bottom_center.copy()
+            offset_vector = bounding_box.right_vector.copy()
+            offset_vector.scaleBy(0.5)
+            manipulator_origin.translateBy(offset_vector)
+            ret = jaw_end_offset_input.setManipulator(manipulator_origin, bounding_box.right_vector)
+            jaw_end_offset_input.expression = current_expression
+            if not ret:
+                futil.log('Failed to set manipulator for jaw_end_offset_input')
 
-def are_vectors_parallel(vector1: adsk.core.Vector3D, vector2: adsk.core.Vector3D, tol: float = 1e-6) -> bool:
-    if abs(vector1.angleTo(vector2)) < tol:
-        return True
+        if changed_input.id != 'jaw_offset':
+            current_expression = jaw_offset_input.expression
+            ret = jaw_offset_input.setManipulator(bounding_box.bottom_center, bounding_box.top_vector)
+            jaw_offset_input.expression = current_expression
+            if not ret:
+                futil.log('Failed to set manipulator for jaw_offset_input')
+
+        if changed_input.id != 'jaw_height':
+            # we put this one pretty far off to the side out of the action of the other manipulators
+            current_expression = jaw_height_input.expression
+            manipulator_origin = bounding_box.bottom_center.copy()
+            offset_vector = bounding_box.rear_vector.copy()
+            offset_vector.normalize()
+            offset_vector.scaleBy(jaw_middle_spacing_input.value/2 + jaw_thickness_input.value/2)
+            manipulator_origin.translateBy(offset_vector)
+            offset_vector = bounding_box.right_vector.copy()
+            offset_vector.scaleBy(0.5)
+            manipulator_origin.translateBy(offset_vector)
+            offset_vector = bounding_box.right_vector.copy()
+            offset_vector.normalize()
+            offset_vector.scaleBy(jaw_end_offset_input.value/2)
+            manipulator_origin.translateBy(offset_vector)
+            pointing_vector = bounding_box.top_vector.copy()
+            pointing_vector.scaleBy(-1)
+            ret = jaw_height_input.setManipulator(manipulator_origin, pointing_vector)
+            jaw_height_input.expression = current_expression
+            if not ret:
+                futil.log('Failed to set manipulator for jaw_height_input')
+
     else:
-        return False
+        inputs.itemById('jaw_theta').isVisible = False
+        hide_show_distance_inputs(inputs, False)
+    # ux feel stuff
+    if changed_input.id == 'part':
+        # if we just selected a part, and the user isn't holding ctrl or shift and there is no face selected then we should activate the face selection
 
-# APIDUMB: There is no way to determine if two faces are tangent to each other, you can get all tangent faces and see if there is a intersection in the list but that is not very efficient
-# like it takes like 0.3 sec per face or more to get the tangent faces, which makes the command unresponsive for a long time
-def are_faces_tangent(face1: adsk.fusion.BRepFace, face2: adsk.fusion.BRepFace, edge: adsk.fusion.BRepEdge, permissive: bool = False) -> bool:
-    # we are going to select a set of 3d points on the edge and determine the normal on each of the faces at the points
-    # then we will compare and see of the normals are parallel within a certain tolerance
-    # first we will get the 3d points on the edge
-    points: List(adsk.core.Point3D) = []
-    parameters = []
-    pts = 11
-    length = edge.length
-    _, start_geom, end_geom = edge.evaluator.getParameterExtents()
-    for i in range(pts):
-        _, param = edge.evaluator.getParameterAtLength(start_geom, length*i/(pts - 1))
-        parameters.append(param)
-    parameters[0] += 1e-6
-    parameters[-1] -= 1e-6
-    good, points = edge.evaluator.getPointsAtParameters(parameters)
-    # now we will get the normals on the faces at the points
-    good1, normals1 = face1.evaluator.getNormalsAtPoints(points)
-    good2, normals2 = face2.evaluator.getNormalsAtPoints(points)
-    if not good1 or not good2 or not good:
-        return False
-    # now we will compare the normals
-    tol = 1e-6
-    if permissive:
-        tol = 1e-2
-    for i in range(pts):
-        if not are_vectors_parallel(normals1[i], normals2[i], tol=tol):
-            # futil.log(f'Normals are not parallel at point {i}')
-            # futil.log(f'Normal 1: {normals1[i].asArray()}')
-            # futil.log(f'Normal 2: {normals2[i].asArray()}')
-            # futil.log(f'Angle: {math.degrees(normals1[i].angleTo(normals2[i]))}\t{normals1[i].angleTo(normals2[i])}')
-            return False
-    return True
+        pass
 
-# We must consolidate the faces into groups based on the chains of faces that are tangent to each other.
-def face_chain_finder(selections: adsk.core.SelectionCommandInput):
-    # first we will create a list of all the entity tokens for the faces
-    face_tokens = []
-    tangent_faces = []
-    if selections.selectionCount <= 1:
-        return [[0]]
-    
-    permissive = selections.parentCommand.commandInputs.itemById('permissive').value
+def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody], face: BRepFace, theta: float, part_datum: PartDatum):
+    # first things first, lets create a new component to house the jaws, within the active component
+    jaw_offset_expression = args.command.commandInputs.itemById('jaw_offset').expression
+    jaw_end_offset_expression = args.command.commandInputs.itemById('jaw_end_offset').expression
+    jaw_middle_spacing_expression = args.command.commandInputs.itemById('jaw_middle_spacing').expression
+    jaw_thickness_expression = args.command.commandInputs.itemById('jaw_thickness').expression
+    jaw_height_expression = args.command.commandInputs.itemById('jaw_height').expression
+    des = adsk.fusion.Design.cast(app.activeProduct)
+    root = des.rootComponent
+    new_component = root.occurrences.addNewComponent(Matrix3D.create()).component
+    new_component.name = 'Softest Jaws'
+    # Create a offset plane from the face by the jaw offset
+    constructionPlanes = new_component.constructionPlanes
+    planeInput = constructionPlanes.createInput()
+    planeInput.setByOffset(face, ValueInput.createByString(f"-({jaw_offset_expression})"))
+    plane = constructionPlanes.add(planeInput)
+    plane.name = "JawTopPlane"
+    # create a sketch on the plane, and put a point on the plane that is the projection of the bottom center of the bounding box
+    # APIDUMB: Why is there no point primitive that that isn't part of a sketch?
+    sketches = new_component.sketches
+    sketch = sketches.add(plane)
+    sketch_points = sketch.sketchPoints
+    our_origin = sketch_points.add(sketch.modelToSketchSpace(part_datum.bottom_center.copy())) # we have to transform it by the sketch origin
+    our_origin.isFixed = True
+    # now we will make a second point that is the projection of the bottom center of the bounding box onto the plane
+    # get the normal of the plane
+    # APIDUMB: Why is there no normal property on the ConstructionPlane, if in reality all planes are just planes why not treat them as planes and have them impl the construction part?
+    # That may be constrained by the ergonomics of Cpp but its still a sharp corner to the situation, ya feel? I ended up not needing that functionality but it annoyed me.
+    # now we can constrain them together, and the one point to the construction plane
+    plane_point: adsk.fusion.SketchPoint = sketch.project(our_origin).item(0)
+    constraints = sketch.geometricConstraints
+    # now we need to make a point off to one side of the origin point in the x axis of the bounding box to use to create a second plane
+    secondary_point = sketch.sketchToModelSpace(plane_point.geometry.copy())
+    secondary_point.translateBy(part_datum.right_vector)
+    secondary_pt = sketch_points.add(sketch.modelToSketchSpace(secondary_point))
+    secondary_pt.isFixed = True
+    # now we can constrain the secondary point to the origin point
+    planeInput = constructionPlanes.createInput()
+    planeInput.setByThreePoints(our_origin, plane_point, secondary_pt)
+    plane2 = constructionPlanes.add(planeInput)
+    plane2.name = "JawCrossSectionPlane"
 
-    for i in range(selections.selectionCount):
-        timer.mark(f'find_chains:nextedge{i}')
-        face_tokens.append(selections.selection(i).entity.entityToken)
-        # Then we will create a list of all the faces that are tangent to the given face
-        valid_faces = []
-        timer.mark(f'find_chains:nextedge{i}_neighbor')
-        neighbor_edges: adsk.fusion.BRepEdges = selections.selection(i).entity.edges
-        for j in range(neighbor_edges.count):
-            edge_faces = neighbor_edges.item(j).faces
-            for k in range(edge_faces.count):
-                if edge_faces.item(k).entityToken != face_tokens[i]:
-                    if are_faces_tangent(selections.selection(i).entity, edge_faces.item(k), neighbor_edges.item(j), permissive=permissive):
-                        valid_faces.append(edge_faces.item(k).entityToken)
-        # now we take the intersection of the two lists to get the faces that are tangent and neighbor faces
-        tangent_faces.append(valid_faces)
-    
-    # Then we will create a list of all the unique lists of tangent faces
-    unique_tangent_chains = [[face_tokens[0]]]
-    for i in range(1, len(tangent_faces)):
-        timer.mark(f'find_chains:unique_chains{i}')
-        b = -1
-        ind_to_pop = []
-        for j in range(len(unique_tangent_chains)):
-            if set(tangent_faces[i]).intersection(set(unique_tangent_chains[j])).__len__() > 0:
-                if b != -1:
-                    unique_tangent_chains[b].extend(unique_tangent_chains[j])
-                    ind_to_pop.append(j)
-                unique_tangent_chains[j].append(face_tokens[i])
-                b = j
-            elif j == len(unique_tangent_chains) - 1 and b == -1:
-                unique_tangent_chains.append([face_tokens[i]])
-        for j in range(len(ind_to_pop)):
-            unique_tangent_chains.pop(ind_to_pop[j] - j)
-    
-    # also make a list of the index of the faces
-    utc_inds = []
-    for i in range(len(unique_tangent_chains)):
-        timer.mark(f'find_chains:utc_inds{i}')
-        utc_inds.append([])
-        for j in range(len(unique_tangent_chains[i])):
-            utc_inds[i].append(face_tokens.index(unique_tangent_chains[i][j]))
-    return utc_inds
-
-def get_faces(face_tokens: List[int], input: adsk.core.SelectionCommandInput) -> List[adsk.fusion.BRepFace]:
-    faces = []
-    for i in face_tokens:
-        faces.append(input.selection(i).entity)
-    return faces
-
-def add_to_vertex_dict(vertex_dict, face: adsk.fusion.BRepFace):
-    """Add the edge to the dictionary based on its start and end vertices."""
-    for vertex in face.vertices:
-        token = vertex.entityToken
-        if token in vertex_dict:
-            vertex_dict[token].append(face)
+    # now we create a sketch on the plane, and draw the cross section of the jaw
+    sketch2 = sketches.add(plane2) # APIDUMB: I really want to be able to give it a orientation like NX so that using Horizontal and Vertical constraints are useful (if i cant they I have to consider them non-deterministic)
+    # Now we shall draw the two rectangles that define the cross section of the jaw
+    # they are identical and will both be jaw_height by jaw_thickness and spaced apart from our_origin by jaw_middle_spacing with their top edges coincident to our_origin
+    # I would draw the first and mirror it, but you may not really want the yaws centered on the part, so I will make it easy to edit for now
+    # First make the top points, they will be be coincident with the other plane and we can use that to establish our horizontal (we dont know if sketch horizontal really is horizontal)
+    our_origin_projection: adsk.fusion.SketchPoint = sketch2.project(our_origin).item(0)
+    plane_point_projection: adsk.fusion.SketchPoint = sketch2.project(plane_point).item(0)
+    center_line = sketch2.sketchCurves.sketchLines.addByTwoPoints(our_origin_projection, plane_point_projection)
+    center_line.isConstruction = True
+    constraints2 = sketch2.geometricConstraints
+    fd_vector: Vector3D = None
+    def create_jaw_half():
+        nonlocal fd_vector
+        # tir = top inner right
+        our_tir_point: adsk.fusion.SketchPoint = None
+        if fd_vector is None:
+            our_tir_point = sketch2.sketchPoints.add(plane_point_projection.geometry.copy()) # we just put it here because its kinda close to where its gotta end up
         else:
-            vertex_dict[token] = [face]
+            new_pt = plane_point_projection.geometry.copy()
+            fd_vector.scaleBy(-1)
+            new_pt.translateBy(fd_vector)
+            our_tir_point = sketch2.sketchPoints.add(new_pt)
+        
+        constraints2.addCoincidentToSurface(our_tir_point, plane2)
+        # constraints2.addCoincidentToSurface(our_tir_point, plane)
+        # now we can add distances to the points
+        dimensions = sketch2.sketchDimensions
 
-def add_to_edge_dict(edge_dict, edict, face: adsk.fusion.BRepFace):
-    """Add the face to the dictionary based on its edges."""
-    for edge in face.edges:
-        token = edge.entityToken
-        edict[token] = edge
-        if token in edge_dict:
-            edge_dict[token].append(face)
-        else:
-            edge_dict[token] = [face]
+        mid_spacing = dimensions.addDistanceDimension(plane_point_projection, our_tir_point, adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, Point3D.create())
+        mid_spacing.parameter.expression = f"({jaw_middle_spacing_expression})/2" # this is such a ass interface, the way the object model handles Parameters vs expressions is strange
 
-def are_edges_connected(edge1: adsk.fusion.BRepEdge, edge2: adsk.fusion.BRepEdge) -> bool:
-    if edge1.startVertex.entityToken == edge2.startVertex.entityToken or edge1.startVertex.entityToken == edge2.endVertex.entityToken or edge1.endVertex.entityToken == edge2.startVertex.entityToken or edge1.endVertex.entityToken == edge2.endVertex.entityToken:
-        return True
-    else:
-        return False
+        # get the vector from the projected origin to the first point to second point and make the second point to that extent beyond the first, so that it ends up on the right side
+        offset_vector = plane_point_projection.geometry.vectorTo(our_tir_point.geometry)
+        new_pt = our_tir_point.geometry.copy()
+        new_pt.translateBy(offset_vector)
+        fd_vector = offset_vector.copy()
+        our_tor_point = sketch2.sketchPoints.add(new_pt)
+        constraints2.addCoincidentToSurface(our_tor_point, plane2)
+        # constraints2.addCoincidentToSurface(our_tor_point, plane)
 
-def find_farthest_edge(face: adsk.fusion.BRepFace, next_face: adsk.fusion.BRepFace) -> adsk.fusion.BRepEdge:
-    # first we must figure out what edge or edges are shared between the two faces
-    shared_edges: List[adsk.fusion.BRepEdge] = []
-    for i in range(face.edges.count):
-        faces = face.edges.item(i).faces
-        for j in range(faces.count):
-            if faces.item(j).entityToken == next_face.entityToken:
-                shared_edges.append(face.edges.item(i))
-    # now we will find the edge that is farthest away from the shared edge
-    farthest_edge = None
-    farthest_dist = 0
-    for i in range(face.edges.count):
-        if face.edges.item(i) not in shared_edges:
-            dists = []
-            for j in range(len(shared_edges)):
-                dists.append(face.edges.item(i).startVertex.geometry.distanceTo(shared_edges[j].startVertex.geometry))
-                dists.append(face.edges.item(i).startVertex.geometry.distanceTo(shared_edges[j].endVertex.geometry))
-                dists.append(face.edges.item(i).endVertex.geometry.distanceTo(shared_edges[j].startVertex.geometry))
-                dists.append(face.edges.item(i).endVertex.geometry.distanceTo(shared_edges[j].endVertex.geometry))
-            avg_dist = sum(dists)/len(dists)
-            if avg_dist > farthest_dist:
-                farthest_edge = face.edges.item(i)
-                farthest_dist = avg_dist
-    return farthest_edge
+        side_spacing = dimensions.addDistanceDimension(our_tor_point, our_tir_point, adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, Point3D.create())
+        side_spacing.parameter.expression = f"{jaw_thickness_expression}"
+
+        # add a point on the inside lower end
+        offset_vector_2 = sketch.sketchToModelSpace(plane_point.geometry).vectorTo(sketch.sketchToModelSpace(our_origin.geometry))
+        offset_vector_2.normalize()
+        new_pt_2 = sketch2.sketchToModelSpace(our_tir_point.geometry).copy()
+        new_pt_2.translateBy(offset_vector_2)
+
+        # Now we draw a line between the two points
+        sketch_lines = sketch2.sketchCurves.sketchLines
+        # APIDUMB: the addThreePointRectangle function is skuffed
+        side_line = sketch_lines.addThreePointRectangle(our_tir_point, our_tor_point, sketch2.modelToSketchSpace(new_pt_2))
+        # now that we have gouged our eyes out, lets constrain the lines correctly
+        # And we just have to hope that the order is deterministic
+        constraints2.addPerpendicular(side_line.item(0), side_line.item(1))
+        constraints2.addPerpendicular(side_line.item(1), side_line.item(2))
+        constraints2.addPerpendicular(side_line.item(2), side_line.item(3))
+        height = dimensions.addDistanceDimension(side_line.item(1).startSketchPoint, side_line.item(1).endSketchPoint, adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, Point3D.create())
+        height.parameter.expression = f"{jaw_height_expression}"
+        # now we must constrain all the points to the plane
+        constraints2.addCoincident(plane_point_projection, side_line.item(0))
+        constraints2.addCoincidentToSurface(side_line.item(1).startSketchPoint, plane2)
+        constraints2.addCoincidentToSurface(side_line.item(1).endSketchPoint, plane2)
+        constraints2.addCoincidentToSurface(side_line.item(3).startSketchPoint, plane2)
+        constraints2.addCoincidentToSurface(side_line.item(3).endSketchPoint, plane2)
+
+        constraints2.addParallel(side_line.item(1), center_line)
+    # dont worry about this, I know what im doing
+    create_jaw_half()
+    create_jaw_half()
+
+    # Now finally we can extrude the soft jaws
+    extrudes = new_component.features.extrudeFeatures
+    object_collection = adsk.core.ObjectCollection.create()
+    for profile in sketch2.profiles:
+        futil.log(f"Adding profile {profile.areaProperties().area}")
+        object_collection.add(profile)
+    extrude_input = extrudes.createInput(object_collection, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    extrude_input.setSymmetricExtent(ValueInput.createByString(f"({part_datum.rear_vector.length} cm)/2 + {jaw_end_offset_expression}"), False)
+    extrude_input.isSolid = True
+
+    bodies = extrudes.add(extrude_input)
 
 
-# Find the loop around the edge of a set of faces
-def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -> (adsk.fusion.BRepBody, adsk.fusion.TimelineObject, adsk.fusion.TimelineObject):
-    edge_dict = {}
-    edict = {}
-    for face in faces:
-        add_to_edge_dict(edge_dict, edict, face)
-    the_faces = faces.copy()
-    ordered_faces = [the_faces.pop(0)]
-    we_ok = True
-    while the_faces:
-        last_face = ordered_faces[-1]
-        matched_face = None
-        for edge in last_face.edges:
-            possible_faces = edge_dict.get(edge.entityToken, [])
-            for face in possible_faces:
-                if face != last_face and face in the_faces:  # Ensure we're not re-adding the same face
-                    matched_face = face
-                    break
-            if matched_face:
-                break
-        if matched_face:
-            we_ok = True
-            ordered_faces.append(matched_face)
-            the_faces.remove(matched_face)
-        elif we_ok:
-            # flip ordered faces and try again
-            ordered_faces.reverse()
-            we_ok = False
-        else:
-            futil.log(f'Failed to find a matching face for the last face. Something is very wrong.')
-            break
-    faces = ordered_faces
 
-    interior_edges_id: Dict[adsk.fusion.BRepEdge] = {}
-    exterior_edges_id: Dict[adsk.fusion.BRepEdge] = {}
-    # all of the edged with more than one face attached to them are interior edges
-    for key, val in edge_dict.items():
-        if len(val) > 1:
-            interior_edges_id[key] = edict[key]
-        else:
-            exterior_edges_id[key] = edict[key]
+def generate_bounding_box_with_face(bodies: List[BRepBody], face: BRepFace, theta: float) -> PartDatum:
+    # This function will make a temporary duplicate of the bodies and align the face to the xy plane and rotate them by the theta
+    # Then we will run the generate_bounding_box function on the temporary bodies and get the bounding box back
+    # then we will do a coordinate transformation on the bounding box to get the points we need
+    # the points will be the front left bottom, front right bottom, front left top, and rear left bottom
 
-    # if the faces make a loop then we will need to make two loops and use a loft instead of a patch
-    # we will check to see if the first and last faces are tangent to each other
-    lofts = features.loftFeatures
-    loft_input = lofts.createInput(adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
-
-    vertex_dict = {}
-    for face in faces:
-        add_to_vertex_dict(vertex_dict, face)
-
-    boundary_edges_id_1: List[adsk.fusion.BRepEdge] = []
-    boundary_edges_id_2: List[adsk.fusion.BRepEdge] = []
-    # for the first face we want to seed the two boundary edges lists with the two edges that touch the first shared edge
-    second_face_set = set([faces[1].vertices.item(j).entityToken for j in range(faces[1].vertices.count)])
-    for i in range(faces[0].edges.count):
-        if set([faces[0].edges.item(i).startVertex.entityToken, faces[0].edges.item(i).endVertex.entityToken]).intersection(second_face_set).__len__() > 0 and faces[0].edges.item(i).entityToken in exterior_edges_id.keys():
-            if len(boundary_edges_id_1) == 0:
-                boundary_edges_id_1.append(faces[0].edges.item(i))
-            elif len(boundary_edges_id_2) == 0:
-                boundary_edges_id_2.append(faces[0].edges.item(i))
-            else:
-                futil.log(f'Found too many seed edges for the first face.')
-
-    # first we will find the edge that is farthest away from the shared edge for the first face
-    farthest_edge = find_farthest_edge(faces[0], faces[1])
-    # then we will find the edge that is farthest away from the shared edge for the last face
-    farthest_edge2 = find_farthest_edge(faces[-1], faces[-2])
-
-    # we will iterate through the faces and add the edges to the boundary edges list until we reach the first face again
-    is_closed_set = (set([faces[0].vertices.item(i).entityToken for i in range(faces[0].vertices.count)]).intersection(set([faces[-1].vertices.item(i).entityToken for i in range(faces[-1].vertices.count)])).__len__() < 2 or len(faces) == 2)
-    for i in range(len(faces)):
-        edges_to_place: List[adsk.fusion.BRepFace] = []
-        for j in range(faces[i].edges.count):
-            if faces[i].edges.item(j).entityToken in exterior_edges_id.keys():
-                # first we have to exit out if one of the corners of the line does not touch a corner of another face
-                if (faces[i].edges.item(j) == farthest_edge or faces[i].edges.item(j) == farthest_edge2) and is_closed_set:
-                    interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
-                    continue
-                if i != 0: # we are going to seed the boundary edges with the first face so we dont want to be deleting those
-                    if faces[i].edges.item(j) in boundary_edges_id_1:
-                        boundary_edges_id_1.remove(faces[i].edges.item(j))
-                        interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
-                        continue
-                    elif faces[i].edges.item(j) in boundary_edges_id_2:
-                        boundary_edges_id_2.remove(faces[i].edges.item(j))
-                        interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
-                        continue
-                elif faces[i].edges.item(j) in boundary_edges_id_1 or faces[i].edges.item(j) in boundary_edges_id_2: # however we do want to skip the seeded edges if we are on the first face
-                    continue
-                edges_to_place.append(faces[i].edges.item(j))
-        while edges_to_place:
-            for edge in edges_to_place:
-                if are_edges_connected(boundary_edges_id_1[-1], edge):
-                    boundary_edges_id_1.append(edge)
-                    edges_to_place.remove(edge)
-                elif are_edges_connected(boundary_edges_id_1[0], edge):
-                    boundary_edges_id_1.insert(0, edge)
-                    edges_to_place.remove(edge)
-                elif are_edges_connected(boundary_edges_id_2[-1], edge):
-                    boundary_edges_id_2.append(edge)
-                    edges_to_place.remove(edge)
-                elif are_edges_connected(boundary_edges_id_2[0], edge):
-                    boundary_edges_id_2.insert(0, edge)
-                    edges_to_place.remove(edge)
-                else:
-                    futil.log(f'Failed to find a matching edge for the last edge.')
+    # make a temporary duplicate of the bodies
+    tempBrepMgr = TemporaryBRepManager.get()
+    temp_bodies = []
+    for body in bodies:
+        temp_bodies.append(tempBrepMgr.copy(body))
     
-    # if the face is not a loop then we will have remove one edge from each end of the surface
-    # first we have to find the edge for each of the ending faces that is the farthest away from the edge shared with the next face
+    # align the face to the xy plane
+    # get the normal of the face
+    _, normal = face.evaluator.getNormalAtPoint(face.pointOnFace)
+    # get the angle between the normal and the z axis
+    z_axis = Vector3D.create(0, 0, 1)
+    face_angle = normal.angleTo(z_axis)
+    # rotate the bodies by the angle
+    # get the rotation axis
+    rotation_axis = normal.crossProduct(z_axis)
+    # get the rotation matrix
+    rotation_matrix2 = Matrix3D.create()
+    rotation_matrix2.setToRotation(face_angle, rotation_axis, face.pointOnFace)
+    # additionally we would like to rotate the bodies about the normal of the face by the theta
+    # get the rotation matrix
+    rotation_matrix = Matrix3D.create()
+    rotation_matrix.setToRotation(theta, normal, face.pointOnFace)
+    # multiply the matrices
+    rotation_matrix.transformBy(rotation_matrix2)
+    # rotate the bodies
+    for body in temp_bodies:
+        tempBrepMgr.transform(body, rotation_matrix)
 
-    # fires we will make a ObjectCollection of the boundary edges
-    boundary_edges_1 = adsk.core.ObjectCollection.create()
-    for i in boundary_edges_id_1:
-        boundary_edges_1.add(i)
-    # now we will find the loop around the boundary edges
-    path_1 = adsk.fusion.Path.create(boundary_edges_1, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
-    boundary_edges_2 = adsk.core.ObjectCollection.create()
-    for i in boundary_edges_id_2:
-        boundary_edges_2.add(i)
-    # now we will find the loop around the boundary edges
-    path_2 = adsk.fusion.Path.create(boundary_edges_2, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
-    # now we will loft the two paths
-    loft_input.loftSections.add(path_1)
-    loft_input.loftSections.add(path_2)
-    for edge in interior_edges_id.values():
-        loft_input.centerLineOrRails.addRail(edge)
-    
-    loft_input.isSolid = False
-    loft = lofts.add(loft_input)
-    return loft.bodies.item(0), loft.timelineObject, loft.timelineObject
+    # get the bounding box
+    bounding_box = generate_bounding_box(temp_bodies)
+    # get the points
+    flb_point = Point3D.create(bounding_box.minPoint.x, bounding_box.minPoint.y, bounding_box.maxPoint.z)
+    frb_point = Point3D.create(bounding_box.maxPoint.x, bounding_box.minPoint.y, bounding_box.maxPoint.z)
+    rlb_point = Point3D.create(bounding_box.minPoint.x, bounding_box.maxPoint.y, bounding_box.maxPoint.z)
+    flt_point = Point3D.create(bounding_box.minPoint.x, bounding_box.minPoint.y, bounding_box.minPoint.z)
 
+    # now transform the points back to the original coordinate system
+    # get the inverse of the rotation matrix
+    rotation_matrix.invert()
+    # transform the points
+    flb_point.transformBy(rotation_matrix)
+    frb_point.transformBy(rotation_matrix)
+    flt_point.transformBy(rotation_matrix)
+    rlb_point.transformBy(rotation_matrix)
+
+    # return the points
+    return PartDatum(flb_point, frb_point, flt_point, rlb_point, theta)
+
+def generate_bounding_box(bodies: List[BRepBody]) -> adsk.core.BoundingBox3D:
+    # This function will generate a bounding around the given bodies
+    bounding_box = bodies[0].boundingBox
+    if len(bodies) > 1:
+        for body in bodies:
+            bounding_box.combine(body.boundingBox)
+    return bounding_box
+
+
+def show_bounding_box(part_datum: PartDatum):
+    # We would like to show the bounding box we have created with custom graphics as it is not aligned to the coordinate system
+    # We will use the graphics object to do this
+    des = adsk.fusion.Design.cast(app.activeProduct)
+    root = des.rootComponent
+    # get the graphics object
+    graphics = root.customGraphicsGroups.add()
+    # first lets create the 3 perpendicular vectors representing the bounding box
+    # now we will create the rest of the points
+    # get the front right top point
+    front_right_top = part_datum.flb_point.copy()
+    front_right_top.translateBy(part_datum.right_vector)
+    front_right_top.translateBy(part_datum.top_vector)
+    # get the rear left top point
+    rear_left_top = part_datum.flb_point.copy()
+    rear_left_top.translateBy(part_datum.rear_vector)
+    rear_left_top.translateBy(part_datum.top_vector)
+    # get the rear right bottom point
+    rear_right_bottom = part_datum.flb_point.copy()
+    rear_right_bottom.translateBy(part_datum.rear_vector)
+    rear_right_bottom.translateBy(part_datum.right_vector)
+    # get the rear right top point
+    rear_right_top = part_datum.flb_point.copy()
+    rear_right_top.translateBy(part_datum.rear_vector)
+    rear_right_top.translateBy(part_datum.right_vector)
+    rear_right_top.translateBy(part_datum.top_vector)
+    # now we will create the lines
+    # create the lines
+    # front face
+    graphics.addCurve(Line3D.create(part_datum.flb_point, part_datum.frb_point))
+    graphics.addCurve(Line3D.create(part_datum.frb_point, front_right_top))
+    graphics.addCurve(Line3D.create(front_right_top, part_datum.flt_point))
+    graphics.addCurve(Line3D.create(part_datum.flt_point, part_datum.flb_point))
+    # rear face
+    graphics.addCurve(Line3D.create(part_datum.rlb_point, rear_left_top))
+    graphics.addCurve(Line3D.create(rear_left_top, rear_right_top))
+    graphics.addCurve(Line3D.create(rear_right_top, rear_right_bottom))
+    graphics.addCurve(Line3D.create(rear_right_bottom, part_datum.rlb_point))
+    # side lines
+    graphics.addCurve(Line3D.create(part_datum.flb_point, part_datum.rlb_point))
+    graphics.addCurve(Line3D.create(part_datum.frb_point, rear_right_bottom))
+    graphics.addCurve(Line3D.create(part_datum.flt_point, rear_left_top))
+    graphics.addCurve(Line3D.create(front_right_top, rear_right_top))
+
+    # now we will create the text
+    app.activeViewport.refresh()
+
+
+def hide_show_distance_inputs(inputs: adsk.core.CommandInputs, show: bool):
+    # this function will hide or show the distance inputs based on the show bool
+    # if show is true, it will show the inputs, if false, it will hide them
+    inputs.itemById('jaw_thickness').isVisible = show
+    inputs.itemById('jaw_height').isVisible = show
+    inputs.itemById('jaw_offset').isVisible = show
+    inputs.itemById('jaw_end_offset').isVisible = show
+    inputs.itemById('jaw_middle_spacing').isVisible = show
 
 # This event handler is called when the command terminates.
 def command_destroy(args: adsk.core.CommandEventArgs):

@@ -273,11 +273,11 @@ def face_chain_finder(selections: adsk.core.SelectionCommandInput):
     permissive = selections.parentCommand.commandInputs.itemById('permissive').value
 
     for i in range(selections.selectionCount):
-        timer.mark(f'find_chains:nextedge{i}')
+        timer.mark(f'find_chains:next_edge{i}')
         face_tokens.append(selections.selection(i).entity.entityToken)
         # Then we will create a list of all the faces that are tangent to the given face
         valid_faces = []
-        timer.mark(f'find_chains:nextedge{i}_neighbor')
+        timer.mark(f'find_chains:next_edge{i}_neighbor')
         neighbor_edges: adsk.fusion.BRepEdges = selections.selection(i).entity.edges
         for j in range(neighbor_edges.count):
             edge_faces = neighbor_edges.item(j).faces
