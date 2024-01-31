@@ -10,7 +10,7 @@ from random import random
 from pathlib import Path
 import csv
 from adsk.core import Point3D, Matrix3D, Cylinder, Vector3D, InfiniteLine3D, Line3D, Selection
-from adsk.fusion import BRepFace
+from adsk.fusion import BRepFace, TemporaryBRepManager
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -203,9 +203,32 @@ def best_display_point(face: BRepFace, cylinder: Cylinder) -> Matrix3D:
     # First we will make a line and infinite line using the axis of the cylinder
     # APIDUMB: Cylinder is really just a circle sketch in 3D, because this cylinder has no length
     res, origin, axis, radius = cylinder.getData()
+    # get a oriented bounding box around the hole aligned with the axis of the hole and then use those extents for the line
+    # make a temporary duplicate of the bodies
+    tempBrepMgr = TemporaryBRepManager.get()
+    face_cpy = tempBrepMgr.copy(face)
+    rotation_matrix = Matrix3D.create()
+    rotation_to_vector = Vector3D.create(0, 0, 1)
+    axis.normalize()
+    angle = axis.angleTo(rotation_to_vector)
+    # create a pivot vector that is perpendicular to the axis and the rotation_to_vector
+    pivot_vector = axis.crossProduct(rotation_to_vector)
+    rotation_matrix.setToRotation(angle, pivot_vector, origin)
+    tempBrepMgr.transform(face_cpy, rotation_matrix)
+    # get the bounding box of the face
+    box = face_cpy.boundingBox
+    # get the height of the box
+    height = box.maxPoint.z - box.minPoint.z
+    # scale the axis to the height of the box
+    axis.scaleBy(height)
     # APIDUMB: There should be no such thing as a Point3D, points are just vectors, having to switch between them is just silly
+    axis.scaleBy(0.5)
+    start_point = origin.copy()
+    start_point.translateBy(axis)
+    axis_m = axis.copy()
+    axis_m.scaleBy(-1)
     end_point = origin.copy()
-    end_point.translateBy(axis)
+    end_point.translateBy(axis_m)
     cylinder_axis = Line3D.create(origin, end_point)
     inf_line = InfiniteLine3D.create(origin, axis)
     edges = face.edges
@@ -228,7 +251,7 @@ def best_display_point(face: BRepFace, cylinder: Cylinder) -> Matrix3D:
     if len(oppose_point) > 1:
         pass
         futil.log("There are more than one face to oppose, this should not happen")
-    
+
     if len(oppose_point) > 0:
         point: Point3D = oppose_point[0]
         # Find the point on the line farthest from the intersection point
@@ -245,8 +268,6 @@ def best_display_point(face: BRepFace, cylinder: Cylinder) -> Matrix3D:
             matrix.translation = cylinder_axis.startPoint.asVector()
         else:
             matrix.translation = cylinder_axis.endPoint.asVector()
-
-    matrix.translation = origin.asVector() # Forget everything we just did above, because the cylinder axis vector isn't useful
     return matrix
 
 def is_cylinder_inward(face: BRepFace):
