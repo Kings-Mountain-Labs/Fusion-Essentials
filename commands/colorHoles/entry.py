@@ -108,7 +108,7 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
         ent: adsk.fusion.BRepFace = sels[0].entity
         cylinderface = adsk.core.Cylinder.cast(ent.geometry)
         if cylinderface and continuous_edges(ent):
-            _, _, _, radius = cylinderface.getData()
+            _, pt, _, radius = cylinderface.getData()
             posSize = findNear(radius)
             if len(posSize) == 0:
                 name = f"D{trt_str(radius*20)}"
@@ -121,7 +121,9 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
             # Now display it using a 2D ui element
             billboard = adsk.fusion.CustomGraphicsBillBoard.create(Point3D.create(0, 0, 0))
             clear_graphics()
-            custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.5, Matrix3D.create())
+            mat = Matrix3D.create()
+            mat.translation = pt.asVector()
+            custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.25, mat)
             # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
             # custom_text.color = adsk.core.Color.create(0, 0, 0, 1)
             custom_text.billBoarding = billboard
