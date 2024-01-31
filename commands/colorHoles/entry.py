@@ -9,7 +9,8 @@ import math
 from random import random
 from pathlib import Path
 import csv
-from adsk.core import Point3D, Matrix3D
+from adsk.core import Point3D, Matrix3D, Cylinder, Vector3D, InfiniteLine3D, Line3D, Selection
+from adsk.fusion import BRepFace
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -101,14 +102,14 @@ def document_changed(args: adsk.core.DocumentEventArgs):
 
 
 def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
-    sels = args.currentSelection
+    selections = args.currentSelection
     global _custom_graphics_group
     settings = shared_state.load_settings(CMD_ID)
-    if len(sels) == 1 and sels[0].entity.objectType == "adsk::fusion::BRepFace" and settings["hover_size"]["default"]:
-        ent: adsk.fusion.BRepFace = sels[0].entity
-        cylinderface = adsk.core.Cylinder.cast(ent.geometry)
-        if cylinderface and continuous_edges(ent):
-            _, pt, _, radius = cylinderface.getData()
+    if len(selections) == 1 and selections[0].entity.objectType == "adsk::fusion::BRepFace" and settings["hover_size"]["default"]:
+        ent: BRepFace = selections[0].entity
+        cylinder_face = Cylinder.cast(ent.geometry)
+        if cylinder_face and continuous_edges(ent) and is_cylinder_inward(ent):
+            _, pt, _, radius = cylinder_face.getData()
             posSize = findNear(radius)
             if len(posSize) == 0:
                 name = f"D{trt_str(radius*20)}"
@@ -121,8 +122,7 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
             # Now display it using a 2D ui element
             billboard = adsk.fusion.CustomGraphicsBillBoard.create(Point3D.create(0, 0, 0))
             clear_graphics()
-            mat = Matrix3D.create()
-            mat.translation = pt.asVector()
+            mat = best_display_point(ent, cylinder_face)
             custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.25, mat)
             # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
             # custom_text.color = adsk.core.Color.create(0, 0, 0, 1)
@@ -194,6 +194,73 @@ class rgbCl:
         self.rgb = f"{r}-{g}-{b}-{o}"
         self.name = f"CH_{self.n}"
 
+def best_display_point(face: BRepFace, cylinder: Cylinder) -> Matrix3D:
+    matrix = Matrix3D.create()
+    # We have two selection criteria, first we want to check if it is a blind hole, if it is we want to display the opposite face
+    # If it is not a blind hole, we want to display the face that is closest to the camera
+    
+    # First we check if it is a blind hole, we will check of there is a face that shares a edge with the current face that is intersected by the axis of the cylinder
+    # First we will make a line and infinite line using the axis of the cylinder
+    # APIDUMB: Cylinder is really just a circle sketch in 3D, because this cylinder has no length
+    res, origin, axis, radius = cylinder.getData()
+    # APIDUMB: There should be no such thing as a Point3D, points are just vectors, having to switch between them is just silly
+    end_point = origin.copy()
+    end_point.translateBy(axis)
+    cylinder_axis = Line3D.create(origin, end_point)
+    inf_line = InfiniteLine3D.create(origin, axis)
+    edges = face.edges
+    oppose_point = []
+    for edge in edges:
+        # get the face that is not the current face
+        other_face = edge.faces.item(0) if edge.faces.item(0) != face else edge.faces.item(1)
+        # check if the face intersects the infinite line
+        # APIDUMB: InfiniteLine3D needs a intersectWithSurfaceEvaluator method to determine if it truly intersects with a face
+        inters = inf_line.intersectWithSurface(other_face.geometry)
+        # check if there are intersections
+        for inter_point in inters:
+            # Check to see that the vector from the farthest point on the line to the intersection point is the opposite as the normal of the face at the point
+            far_point = cylinder_axis.startPoint if cylinder_axis.startPoint.distanceTo(inter_point) > cylinder_axis.endPoint.distanceTo(inter_point) else cylinder_axis.endPoint
+            intersection_vector = far_point.vectorTo(inter_point)
+            _, normal = other_face.evaluator.getNormalAtPoint(inter_point)
+            if intersection_vector.dotProduct(normal) < 0:
+                oppose_point.append(inter_point)
+    # if there are faces to oppose we will use the first one, and just put a message if there is more than one
+    if len(oppose_point) > 1:
+        pass
+        futil.log("There are more than one face to oppose, this should not happen")
+    
+    if len(oppose_point) > 0:
+        point: Point3D = oppose_point[0]
+        # Find the point on the line farthest from the intersection point
+        if point.distanceTo(cylinder_axis.startPoint) > point.distanceTo(cylinder_axis.endPoint):
+            matrix.translation = cylinder_axis.startPoint.asVector()
+        else:
+            matrix.translation = cylinder_axis.endPoint.asVector()
+    else:
+        # If there are no faces to oppose, we will just use the point on the line that is closest to the camera
+        # lets get the view direction
+        view = app.activeViewport
+        # get the point on the line that is closest to the camera
+        if cylinder_axis.startPoint.distanceTo(view.camera.eye) < cylinder_axis.endPoint.distanceTo(view.camera.eye):
+            matrix.translation = cylinder_axis.startPoint.asVector()
+        else:
+            matrix.translation = cylinder_axis.endPoint.asVector()
+
+    matrix.translation = origin.asVector() # Forget everything we just did above, because the cylinder axis vector isn't useful
+    return matrix
+
+def is_cylinder_inward(face: BRepFace):
+    cylinder = Cylinder.cast(face.geometry)
+    if cylinder:
+        res, origin, axis, radius = cylinder.getData()
+        # get the normal of the face at a point on the cylinder and see if it is pointing towards the center of the cylinder
+        _, normal = face.evaluator.getNormalAtPoint(face.pointOnFace)
+        # get the vector from the origin of the cylinder to the point on the face
+        vec = face.pointOnFace.vectorTo(origin)
+        # if the dot product of the normal and the vector is negative, the normal is pointing away from the center of the cylinder's axis
+        return (normal.dotProduct(vec) > 0)
+    return False
+    
 
 def mk_color(rgb: rgbCl):
     app = adsk.core.Application.get()
@@ -244,9 +311,9 @@ def create_color(bodies, semi: bool):
         faces = body.faces
         for i in range(faces.count):
             face = faces.item(i)
-            cylinderface = adsk.core.Cylinder.cast(face.geometry)
-            if cylinderface and continuous_edges(face):
-                res, origin, axis, radius = cylinderface.getData()
+            cylinder_face = Cylinder.cast(face.geometry)
+            if cylinder_face and continuous_edges(face) and is_cylinder_inward(face):
+                res, origin, axis, radius = cylinder_face.getData()
                 holes.append([j, i, radius, origin.x, origin.y, origin.z, axis.x, axis.y, axis.z])
                 fiq.append(face)
     sizes = {}
@@ -265,9 +332,9 @@ def create_color(bodies, semi: bool):
             sizes[trt_str(hole[2])] = rgbCl(int(random()*255), int(random()*255), int(random()*255), 0, name) 
     
     for face in fiq:
-        cylinderface = adsk.core.Cylinder.cast(face.geometry)
-        if cylinderface:
-            res, origin, axis, radius = cylinderface.getData()
+        cylinder_face = Cylinder.cast(face.geometry)
+        if cylinder_face:
+            res, origin, axis, radius = cylinder_face.getData()
             color = sizes[trt_str(radius)]
             app = mk_color(color)
             face.appearance = app
