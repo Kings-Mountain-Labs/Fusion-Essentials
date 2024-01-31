@@ -104,7 +104,7 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
     sels = args.currentSelection
     global _custom_graphics_group
     settings = shared_state.load_settings(CMD_ID)
-    if len(sels) == 1 and sels[0].entity.objectType == "adsk::fusion::BRepFace" and settings['hover_size']["default"] == True:
+    if len(sels) == 1 and sels[0].entity.objectType == "adsk::fusion::BRepFace" and settings["hover_size"]["default"]:
         ent: adsk.fusion.BRepFace = sels[0].entity
         cylinderface = adsk.core.Cylinder.cast(ent.geometry)
         if cylinderface and continuous_edges(ent):
