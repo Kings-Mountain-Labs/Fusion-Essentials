@@ -6,6 +6,8 @@ from ... import shared_state
 from ...timer import Timer, format_timer
 from typing import List, Dict
 import math
+from adsk.core import ObjectCollection, Vector3D, Point3D, Line3D
+from adsk.fusion import BRepEdge, BRepFace, TimelineObject, Path, BRepEdges, TimelineGroups, Features, BRepBody, BRepVertex, SketchLine
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -155,9 +157,9 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
     product = adsk.fusion.Design.cast(app.activeProduct)
     active_comp = product.activeComponent
     features = active_comp.features
-    firstTLN: adsk.fusion.TimelineObject = None
-    stitch_entities = adsk.core.ObjectCollection.create()
-    unstitch_entities = adsk.core.ObjectCollection.create()
+    firstTLN: TimelineObject = None
+    stitch_entities = ObjectCollection.create()
+    unstitch_entities = ObjectCollection.create()
     faces_to_delete = []
     facess = []
     timer.mark('get_faces')
@@ -200,7 +202,7 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         # now we will delete the faces that are selected
         timer.mark('delete_faces')
         delete_features = active_comp.features.deleteFaceFeatures
-        delete_entities = adsk.core.ObjectCollection.create()
+        delete_entities = ObjectCollection.create()
         for i in range(len(faces_to_delete)):
             ent_list = active_comp.parentDesign.findEntityByToken(faces_to_delete[i])
             delete_entities.add(ent_list[0])
@@ -214,14 +216,14 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         
     if firstTLN is not None and firstTLN.index != secondTLN.index:
         timer.mark('timeline')
-        tgs: adsk.fusion.TimelineGroups = product.timeline.timelineGroups
+        tgs: TimelineGroups = product.timeline.timelineGroups
         tg = tgs.add(firstTLN.index, secondTLN.index)
 
     timing = timer.finish()
     if config.DEBUG:
         futil.log(format_timer(timing))
 
-def are_vectors_parallel(vector1: adsk.core.Vector3D, vector2: adsk.core.Vector3D, tol: float = 1e-6) -> bool:
+def are_vectors_parallel(vector1: Vector3D, vector2: Vector3D, tol: float = 1e-6) -> bool:
     if abs(vector1.angleTo(vector2)) < tol:
         return True
     else:
@@ -229,11 +231,11 @@ def are_vectors_parallel(vector1: adsk.core.Vector3D, vector2: adsk.core.Vector3
 
 # APIDUMB: There is no way to determine if two faces are tangent to each other, you can get all tangent faces and see if there is a intersection in the list but that is not very efficient
 # like it takes like 0.3 sec per face or more to get the tangent faces, which makes the command unresponsive for a long time
-def are_faces_tangent(face1: adsk.fusion.BRepFace, face2: adsk.fusion.BRepFace, edge: adsk.fusion.BRepEdge, permissive: bool = False) -> bool:
+def are_faces_tangent(face1: BRepFace, face2: BRepFace, edge: BRepEdge, permissive: bool = False) -> bool:
     # we are going to select a set of 3d points on the edge and determine the normal on each of the faces at the points
     # then we will compare and see of the normals are parallel within a certain tolerance
     # first we will get the 3d points on the edge
-    points: List(adsk.core.Point3D) = []
+    points: List(Point3D) = []
     parameters = []
     pts = 11
     length = edge.length
@@ -273,12 +275,12 @@ def face_chain_finder(selections: adsk.core.SelectionCommandInput):
     permissive = selections.parentCommand.commandInputs.itemById('permissive').value
 
     for i in range(selections.selectionCount):
-        timer.mark(f'find_chains:nextedge{i}')
+        timer.mark(f'find_chains:next_edge{i}')
         face_tokens.append(selections.selection(i).entity.entityToken)
         # Then we will create a list of all the faces that are tangent to the given face
         valid_faces = []
-        timer.mark(f'find_chains:nextedge{i}_neighbor')
-        neighbor_edges: adsk.fusion.BRepEdges = selections.selection(i).entity.edges
+        timer.mark(f'find_chains:next_edge{i}_neighbor')
+        neighbor_edges: BRepEdges = selections.selection(i).entity.edges
         for j in range(neighbor_edges.count):
             edge_faces = neighbor_edges.item(j).faces
             for k in range(edge_faces.count):
@@ -315,13 +317,13 @@ def face_chain_finder(selections: adsk.core.SelectionCommandInput):
             utc_inds[i].append(face_tokens.index(unique_tangent_chains[i][j]))
     return utc_inds
 
-def get_faces(face_tokens: List[int], input: adsk.core.SelectionCommandInput) -> List[adsk.fusion.BRepFace]:
+def get_faces(face_tokens: List[int], input: adsk.core.SelectionCommandInput) -> List[BRepFace]:
     faces = []
     for i in face_tokens:
         faces.append(input.selection(i).entity)
     return faces
 
-def add_to_vertex_dict(vertex_dict, face: adsk.fusion.BRepFace):
+def add_to_vertex_dict(vertex_dict, face: BRepFace):
     """Add the edge to the dictionary based on its start and end vertices."""
     for vertex in face.vertices:
         token = vertex.entityToken
@@ -330,7 +332,7 @@ def add_to_vertex_dict(vertex_dict, face: adsk.fusion.BRepFace):
         else:
             vertex_dict[token] = [face]
 
-def add_to_edge_dict(edge_dict, edict, face: adsk.fusion.BRepFace):
+def add_to_edge_dict(edge_dict, edict, face: BRepFace):
     """Add the face to the dictionary based on its edges."""
     for edge in face.edges:
         token = edge.entityToken
@@ -340,15 +342,35 @@ def add_to_edge_dict(edge_dict, edict, face: adsk.fusion.BRepFace):
         else:
             edge_dict[token] = [face]
 
-def are_edges_connected(edge1: adsk.fusion.BRepEdge, edge2: adsk.fusion.BRepEdge) -> bool:
+def are_edges_connected(edge1: BRepEdge, edge2: BRepEdge) -> bool:
     if edge1.startVertex.entityToken == edge2.startVertex.entityToken or edge1.startVertex.entityToken == edge2.endVertex.entityToken or edge1.endVertex.entityToken == edge2.startVertex.entityToken or edge1.endVertex.entityToken == edge2.endVertex.entityToken:
         return True
     else:
         return False
+    
+def are_edge_and_line_connected(edge: BRepEdge, line: Line3D) -> bool:
+    if edge.startVertex.geometry.isEqualTo(line.startPoint) or edge.startVertex.geometry.isEqualTo(line.endPoint) or edge.endVertex.geometry.isEqualTo(line.startPoint) or edge.endVertex.geometry.isEqualTo(line.endPoint):
+        return True
+    else:
+        return False
 
-def find_farthest_edge(face: adsk.fusion.BRepFace, next_face: adsk.fusion.BRepFace) -> adsk.fusion.BRepEdge:
+def are_lines_connected(line1: Line3D, line2: Line3D) -> bool:
+    if line1.startPoint.isEqualTo(line2.startPoint) or line1.startPoint.isEqualTo(line2.endPoint) or line1.endPoint.isEqualTo(line2.startPoint) or line1.endPoint.isEqualTo(line2.endPoint):
+        return True
+    else:
+        return False
+    
+def get_shared_vertex(edge1: BRepEdge, edge2: BRepEdge) -> BRepVertex:
+    if edge1.startVertex.entityToken == edge2.startVertex.entityToken or edge1.startVertex.entityToken == edge2.endVertex.entityToken:
+        return edge1.startVertex
+    elif edge1.endVertex.entityToken == edge2.startVertex.entityToken or edge1.endVertex.entityToken == edge2.endVertex.entityToken:
+        return edge1.endVertex
+    else:
+        return None
+
+def find_farthest_edge(face: BRepFace, next_face: BRepFace) -> BRepEdge:
     # first we must figure out what edge or edges are shared between the two faces
-    shared_edges: List[adsk.fusion.BRepEdge] = []
+    shared_edges: List[BRepEdge] = []
     for i in range(face.edges.count):
         faces = face.edges.item(i).faces
         for j in range(faces.count):
@@ -373,7 +395,7 @@ def find_farthest_edge(face: adsk.fusion.BRepFace, next_face: adsk.fusion.BRepFa
 
 
 # Find the loop around the edge of a set of faces
-def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -> (adsk.fusion.BRepBody, adsk.fusion.TimelineObject, adsk.fusion.TimelineObject):
+def patcher(faces: List[BRepFace], features: Features) -> (BRepBody, TimelineObject, TimelineObject):
     edge_dict = {}
     edict = {}
     for face in faces:
@@ -405,8 +427,9 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
             break
     faces = ordered_faces
 
-    interior_edges_id: Dict[adsk.fusion.BRepEdge] = {}
-    exterior_edges_id: Dict[adsk.fusion.BRepEdge] = {}
+    interior_edges_id: Dict[str, BRepEdge] = {}
+    end_edges_id: Dict[str, BRepEdge] = {}
+    exterior_edges_id: Dict[str, BRepEdge] = {}
     # all of the edged with more than one face attached to them are interior edges
     for key, val in edge_dict.items():
         if len(val) > 1:
@@ -423,8 +446,8 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
     for face in faces:
         add_to_vertex_dict(vertex_dict, face)
 
-    boundary_edges_id_1: List[adsk.fusion.BRepEdge] = []
-    boundary_edges_id_2: List[adsk.fusion.BRepEdge] = []
+    boundary_edges_id_1: List[BRepEdge] = []
+    boundary_edges_id_2: List[BRepEdge] = []
     # for the first face we want to seed the two boundary edges lists with the two edges that touch the first shared edge
     second_face_set = set([faces[1].vertices.item(j).entityToken for j in range(faces[1].vertices.count)])
     for i in range(faces[0].edges.count):
@@ -444,21 +467,21 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
     # we will iterate through the faces and add the edges to the boundary edges list until we reach the first face again
     is_closed_set = (set([faces[0].vertices.item(i).entityToken for i in range(faces[0].vertices.count)]).intersection(set([faces[-1].vertices.item(i).entityToken for i in range(faces[-1].vertices.count)])).__len__() < 2 or len(faces) == 2)
     for i in range(len(faces)):
-        edges_to_place: List[adsk.fusion.BRepFace] = []
+        edges_to_place: List[BRepFace] = []
         for j in range(faces[i].edges.count):
             if faces[i].edges.item(j).entityToken in exterior_edges_id.keys():
                 # first we have to exit out if one of the corners of the line does not touch a corner of another face
                 if (faces[i].edges.item(j) == farthest_edge or faces[i].edges.item(j) == farthest_edge2) and is_closed_set:
-                    interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
+                    end_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
                     continue
                 if i != 0: # we are going to seed the boundary edges with the first face so we dont want to be deleting those
                     if faces[i].edges.item(j) in boundary_edges_id_1:
                         boundary_edges_id_1.remove(faces[i].edges.item(j))
-                        interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
+                        end_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
                         continue
                     elif faces[i].edges.item(j) in boundary_edges_id_2:
                         boundary_edges_id_2.remove(faces[i].edges.item(j))
-                        interior_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
+                        end_edges_id[faces[i].edges.item(j).entityToken] = faces[i].edges.item(j)
                         continue
                 elif faces[i].edges.item(j) in boundary_edges_id_1 or faces[i].edges.item(j) in boundary_edges_id_2: # however we do want to skip the seeded edges if we are on the first face
                     continue
@@ -484,25 +507,83 @@ def patcher(faces: List[adsk.fusion.BRepFace], features: adsk.fusion.Features) -
     # first we have to find the edge for each of the ending faces that is the farthest away from the edge shared with the next face
 
     # fires we will make a ObjectCollection of the boundary edges
-    boundary_edges_1 = adsk.core.ObjectCollection.create()
+    boundary_edges_1 = ObjectCollection.create()
     for i in boundary_edges_id_1:
         boundary_edges_1.add(i)
     # now we will find the loop around the boundary edges
-    path_1 = adsk.fusion.Path.create(boundary_edges_1, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
-    boundary_edges_2 = adsk.core.ObjectCollection.create()
+    path_1 = Path.create(boundary_edges_1, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
+    boundary_edges_2 = ObjectCollection.create()
     for i in boundary_edges_id_2:
         boundary_edges_2.add(i)
     # now we will find the loop around the boundary edges
-    path_2 = adsk.fusion.Path.create(boundary_edges_2, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
+    path_2 = Path.create(boundary_edges_2, adsk.fusion.ChainedCurveOptions.connectedChainedCurves)
     # now we will loft the two paths
     loft_input.loftSections.add(path_1)
     loft_input.loftSections.add(path_2)
     for edge in interior_edges_id.values():
         loft_input.centerLineOrRails.addRail(edge)
     
+    # now we add rails for the ends, if they are tangent with one of the other edges of the face
+    # in a way that creates a cusp then we will add a line between the two ends of the edge and use that as the rail
+    # then we will have to cut the loft with the edge and our new line
+    # Create a sketch to put any potential lines on
+    product = adsk.fusion.Design.cast(app.activeProduct)
+    active_comp = product.activeComponent
+    sketch = active_comp.sketches.add(active_comp.xYConstructionPlane)
+    chop_face: List[(BRepFace, SketchLine)] = []
+    for edge in end_edges_id.values():
+        # Find the edges that form the path that we care about intersecting
+        for test_edge in [boundary_edges_id_1[0], boundary_edges_id_1[-1], boundary_edges_id_2[0], boundary_edges_id_2[-1]]:
+            if are_edges_connected(test_edge, edge):
+                shared_point = get_shared_vertex(test_edge, edge)
+                # we know shared_point is infallible because we just called are_edges_connected
+                # We now need to check if the two edges are tangent and pointing the same direction at the shared point
+                _, edge_point = edge.evaluator.getParameterAtPoint(shared_point.geometry)
+                _, edge_tangent = edge.evaluator.getTangent(edge_point)
+                _, boundary_point = test_edge.evaluator.getParameterAtPoint(shared_point.geometry)
+                _, boundary_tangent = test_edge.evaluator.getTangent(boundary_point)
+                if edge_tangent.isParallelTo(boundary_tangent):
+                    # APIDUMB: This needs to be better documented
+                    # It would be nice if the API didn't just use base everywhere and gave you some better typing information
+                    # The hacky way would be to have functions for multiple input types  
+                    pt_1 = sketch.include(edge.startVertex).item(0)
+                    pt_2 = sketch.include(edge.endVertex).item(0)
+                    
+                    line: SketchLine = sketch.sketchCurves.sketchLines.addByTwoPoints(pt_1, pt_2)
+                    loft_input.centerLineOrRails.addRail(line)
+                    # get the opposing face on the edge
+                    opposite_face = edge.faces.item(0) if not edge.faces.item(0).entityToken in faces else edge.faces.item(1)
+                    chop_face.append((opposite_face, line))
+                    break
+    sketch.isVisible = False
     loft_input.isSolid = False
     loft = lofts.add(loft_input)
-    return loft.bodies.item(0), loft.timelineObject, loft.timelineObject
+    return_body = loft.bodies.item(0)
+    last_tlo = loft.timelineObject
+    if len(chop_face) > 0:
+        # now we will chop the loft with the line
+        chop_features = active_comp.features.splitFaceFeatures
+        loft_body_oc = ObjectCollection.create()
+        # APIDUMB: any of the BRep plural types should be castable into a object collection
+        for face in loft.faces:
+            loft_body_oc.add(face)
+        for face, sketch_line in chop_face:
+            chop_input = chop_features.createInput(loft_body_oc, face, True)
+            chop = chop_features.add(chop_input)
+            # remove the face that we just chopped
+            new_faces = chop.faces
+            bad_face: BRepFace = None
+            # Fend the one we want to throw away
+            for p_face in new_faces:
+                if p_face.vertices.count == 2:
+                    if are_edge_and_line_connected(p_face.edges.item(0), sketch_line.geometry):
+                        bad_face = p_face
+                        break
+            delete_features = active_comp.features.surfaceDeleteFaceFeatures
+            delete = delete_features.add(bad_face)
+            last_tlo = delete.timelineObject
+
+    return return_body, sketch.timelineObject, last_tlo
 
 
 # This event handler is called when the command terminates.
