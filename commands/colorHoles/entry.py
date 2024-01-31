@@ -9,6 +9,7 @@ import math
 from random import random
 from pathlib import Path
 import csv
+from adsk.core import Point3D, Matrix3D
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -27,7 +28,7 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 DEFAULT_SETTINGS = {
     "hover_size": {
         "type": "checkbox",
-        "label": "Show Size on Hover",
+        "label": "Show Size on Selection",
         "default": True
     },
     "preview_default": {
@@ -57,18 +58,23 @@ timer = Timer()
 # they are not released and garbage collected.
 local_handlers = []
 _holes: list = None
+_custom_graphics_group: adsk.fusion.CustomGraphicsGroup = None
 
 def start():
+    global _holes
+    _holes = loadHoles()
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
     futil.add_handler(cmd_def.commandCreated, command_created)
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
     control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
     control.isPromoted = IS_PROMOTED
-    futil.add_handler(ui.activeSelections.add, active_selection_changed, local_handlers=local_handlers)
+    futil.add_handler(ui.activeSelectionChanged, active_selection_changed)
+    futil.add_handler(app.documentActivated, document_changed)
 
 def stop():
     # Get the various UI elements for this command
+    clear_graphics()
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
     command_control = panel.controls.itemById(CMD_ID)
@@ -81,18 +87,50 @@ def stop():
         command_definition.deleteMe()
 
     # Remove the event handlers
-    local_handlers.clear()
+    futil.clear_handlers()
+
+def document_changed(args: adsk.core.DocumentEventArgs):
+    # General logging for debug.
+    futil.log(f'{CMD_NAME} Document Changed Event')
+    global _custom_graphics_group
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
+
 
 def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
     sels = args.currentSelection
-    if len(sels) == 1 and sels[0].entity.objectType == "adsk::fusion::BRepFace":
+    global _custom_graphics_group
+    settings = shared_state.load_settings(CMD_ID)
+    if len(sels) == 1 and sels[0].entity.objectType == "adsk::fusion::BRepFace" and settings['hover_size']["default"] == True:
         ent: adsk.fusion.BRepFace = sels[0].entity
         cylinderface = adsk.core.Cylinder.cast(ent.geometry)
         if cylinderface and continuous_edges(ent):
-            app = ent.appearance
-            apptxt = app.name
-            if apptxt.__contains__("CH_"):
-                futil.log(apptxt[3:].replace(" or ", "\nor\n"), "Hole Information")
+            _, _, _, radius = cylinderface.getData()
+            posSize = findNear(radius)
+            if len(posSize) == 0:
+                name = f"D{trt_str(radius*20)}"
+            elif len(posSize) == 1:
+                name = posSize[0]
+            else:
+                name = posSize[0]
+                for n in posSize[1:]:
+                    name = f"{name}\nor\n{n}"
+            # Now display it using a 2D ui element
+            billboard = adsk.fusion.CustomGraphicsBillBoard.create(Point3D.create(0, 0, 0))
+            clear_graphics()
+            custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.5, Matrix3D.create())
+            # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
+            # custom_text.color = adsk.core.Color.create(0, 0, 0, 1)
+            custom_text.billBoarding = billboard
+        else:
+            clear_graphics()
+    else:
+        clear_graphics()
+
+def clear_graphics():
+    global _custom_graphics_group
+    for graphic in range(_custom_graphics_group.count):
+        _custom_graphics_group.item(graphic).deleteMe()
 
 def command_created(args: adsk.core.CommandCreatedEventArgs):
     # General logging for debug.
@@ -111,7 +149,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
 
     semiCmd = inputs.addBoolValueInput('semi', 'Color Partial Surfaces', True, "", True)
-    previewCmd = inputs.addBoolValueInput('preview', 'Preview Selection', True, "", settings['preview_default'])
+    previewCmd = inputs.addBoolValueInput('preview', 'Preview Selection', True, "", settings['preview_default']["default"])
 
 
 def command_execute(args: adsk.core.CommandEventArgs):
@@ -167,9 +205,6 @@ def mk_color(rgb: rgbCl):
         
         # Copy it to the design, giving it a new name.
         newColor = design.appearances.addByCopy(yellowColor, rgb.name)
-                    
-        
-        # _ui.messageBox(f"Hole Size: {newColor.appearanceProperties.itemByName('Image').isReadOnly}")
 
         # Change the color of the appearance to red.
         colorProp = adsk.core.ColorProperty.cast(newColor.appearanceProperties.itemByName('Color'))
@@ -190,45 +225,7 @@ def findNear(rad):
     return posSizes
 
 def continuous_edges(face):
-    firstLoopArr = []
-    secondLoopArr = []
-    edges = face.edges
-    useSecondLoop = False
-    # for edge in edges:
-    #     if  edge in firstLoopArr or edge in secondLoopArr:
-    #         pass
-    #     elif len(firstLoopArr) == 0:
-    #         firstLoopArr.append(edge)
-    #         tempprofile = edge.tangentiallyConnectedEdges
-    #         startIndex = tempprofile.find(edge)
-    #         profLen = tempprofile.count
-    #         for i in range(startIndex+1,profLen):
-    #             curEdge = tempprofile.item(i)
-    #             if curEdge in edges and not curEdge in firstLoopArr:
-    #                 firstLoopArr.append(curEdge)
-    #         for i in range(0, startIndex-1):
-    #             curEdge = tempprofile.item(i)
-    #             if curEdge in edges and not curEdge in firstLoopArr:
-    #                 firstLoopArr.append(curEdge)
-    #     elif (firstLoopArr[0].endVertex == firstLoopArr[-1].startVertex or firstLoopArr[-1].endVertex == firstLoopArr[0].startVertex):
-    #         if len(secondLoopArr) == 0:
-    #             useSecondLoop = True
-    #             secondLoopArr.append(edge)
-    #         tempprofile = edge.tangentiallyConnectedEdges
-    #         startIndex = tempprofile.find(edge)
-    #         profLen = tempprofile.count
-    #         for i in range(startIndex+1,profLen):
-    #             curEdge = tempprofile.item(i)
-    #             if curEdge in edges and not curEdge in secondLoopArr:
-    #                 secondLoopArr.append(curEdge)
-    #         for i in range(0, startIndex-1):
-    #             curEdge = tempprofile.item(i)
-    #             if curEdge in edges and not curEdge in secondLoopArr:
-    #                 secondLoopArr.append(curEdge)
-    if face.loops.count > 1:
-        useSecondLoop = True
-    return useSecondLoop
-
+    return face.loops.count > 1
 
 def create_color(bodies, semi: bool):
 
