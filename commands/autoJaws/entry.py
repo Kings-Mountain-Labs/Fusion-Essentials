@@ -330,6 +330,7 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     constructionPlanes = new_component.constructionPlanes
     planeInput = constructionPlanes.createInput()
     planeInput.setByOffset(face, ValueInput.createByString(f"-({jaw_offset_expression})"))
+    
     plane = constructionPlanes.add(planeInput)
     plane.name = "JawTopPlane"
     # create a sketch on the plane, and put a point on the plane that is the projection of the bottom center of the bounding box
@@ -357,6 +358,16 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     plane2 = constructionPlanes.add(planeInput)
     plane2.name = "JawCrossSectionPlane"
 
+    tertiary_point = sketch.sketchToModelSpace(plane_point.geometry.copy())
+    tertiary_point.translateBy(part_datum.rear_vector)
+    tertiary_pt = sketch_points.add(sketch.modelToSketchSpace(tertiary_point))
+    tertiary_pt.isFixed = True
+    # now we can generate the third plane, this plane we will use for generating the holes
+    planeInput = constructionPlanes.createInput()
+    planeInput.setByThreePoints(our_origin, plane_point, tertiary_pt)
+    plane3 = constructionPlanes.add(planeInput)
+    plane3.name = "CenterPlane"
+
     # now we create a sketch on the plane, and draw the cross section of the jaw
     sketch2 = sketches.add(plane2) # APIDUMB: I really want to be able to give it a orientation like NX so that using Horizontal and Vertical constraints are useful (if i cant they I have to consider them non-deterministic)
     # Now we shall draw the two rectangles that define the cross section of the jaw
@@ -382,7 +393,6 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
             our_tir_point = sketch2.sketchPoints.add(new_pt)
         
         constraints2.addCoincidentToSurface(our_tir_point, plane2)
-        # constraints2.addCoincidentToSurface(our_tir_point, plane)
         # now we can add distances to the points
         dimensions = sketch2.sketchDimensions
 
@@ -396,20 +406,20 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
         fd_vector = offset_vector.copy()
         our_tor_point = sketch2.sketchPoints.add(new_pt)
         constraints2.addCoincidentToSurface(our_tor_point, plane2)
-        # constraints2.addCoincidentToSurface(our_tor_point, plane)
 
         side_spacing = dimensions.addDistanceDimension(our_tor_point, our_tir_point, adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, Point3D.create())
         side_spacing.parameter.expression = f"{jaw_thickness_expression}"
 
         # add a point on the inside lower end
-        offset_vector_2 = sketch.sketchToModelSpace(plane_point.geometry).vectorTo(sketch.sketchToModelSpace(our_origin.geometry))
+        _, offset_vector_2 = face.evaluator.getNormalAtPoint(face.pointOnFace)
         offset_vector_2.normalize()
+        offset_vector_2.scaleBy(-1)
         new_pt_2 = sketch2.sketchToModelSpace(our_tir_point.geometry).copy()
         new_pt_2.translateBy(offset_vector_2)
 
         # Now we draw a line between the two points
         sketch_lines = sketch2.sketchCurves.sketchLines
-        # APIDUMB: the addThreePointRectangle function is skuffed
+        # APIDUMB: the addThreePointRectangle function is scuffed
         side_line = sketch_lines.addThreePointRectangle(our_tir_point, our_tor_point, sketch2.modelToSketchSpace(new_pt_2))
         # now that we have gouged our eyes out, lets constrain the lines correctly
         # And we just have to hope that the order is deterministic
@@ -434,15 +444,32 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     extrudes = new_component.features.extrudeFeatures
     object_collection = adsk.core.ObjectCollection.create()
     for profile in sketch2.profiles:
-        futil.log(f"Adding profile {profile.areaProperties().area}")
+        # futil.log(f"Adding profile {profile.areaProperties().area}")
         object_collection.add(profile)
     extrude_input = extrudes.createInput(object_collection, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
     extrude_input.setSymmetricExtent(ValueInput.createByString(f"({part_datum.rear_vector.length} cm)/2 + {jaw_end_offset_expression}"), False)
     extrude_input.isSolid = True
 
-    bodies = extrudes.add(extrude_input)
+    jaw_bodies = extrudes.add(extrude_input)
 
+    # And now the fun part, creating the hole for the part
+    # APIDUMB: Literally all the BRep types should have hella evaluators, the fact that I have to invent everything on my own is dumb, like really excruciatingly dumb
+    
+    # Complete the following steps to create a soft jaw hollowing, repeat for each jaw
+    # Step 1: Boolean the part from the jaw
+    # Step 2: Collect all the surfaces that the boolean generated
+    # Step 3: Preprocess and remove clearance any shitty geometry
+    # Step 3.1: Replace all Z-axis toroids with a cylindrical counterbore
+    # Step 4: Project each of the faces onto the sketch plane
+    # Step 5: Do a extruded cut from the projection on the plane to the face with a through body extent
+    # Step 6: Remove non flat floor faces
+    # Step 7: Dogbone internal corners
+    # Step 7.1: Find all sharp vertical internal radiuses
+    # Step 7.2: Create a dogbone sketch on the top plane
+    # Step 7.3: Extrude the dogbone sketch to the bottom of the edge
 
+    # Step 1
+    
 
 def generate_bounding_box_with_face(bodies: List[BRepBody], face: BRepFace, theta: float) -> PartDatum:
     # This function will make a temporary duplicate of the bodies and align the face to the xy plane and rotate them by the theta
