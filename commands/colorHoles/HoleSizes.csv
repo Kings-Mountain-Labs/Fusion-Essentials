@@ -1,0 +1,468 @@
+Name,ID,Software
+M90x6.0 Tap Drill,84,SW
+M90x4.0 Tap Drill,86,SW
+M8x1.25 Tap Drill,6.8,SW
+M8x1.0 Tap Drill,7,SW
+M80x6.0 Tap Drill,74,SW
+M80x4.0 Tap Drill,76,SW
+M7x1.0 Tap Drill,6,SW
+M72x6.0 Tap Drill,66,SW
+M72x4.0 Tap Drill,68,SW
+M6x1.0 Tap Drill,5,SW
+M68x6.0 Tap Drill,62,SW
+M64x6.0 Tap Drill,58,SW
+M64x4.0 Tap Drill,60,SW
+M60x5.5 Tap Drill,54.5,SW
+M60x1.5 Tap Drill,58.5,SW
+M5x0.8 Tap Drill,4.2,SW
+M56x5.5 Tap Drill,50.5,SW
+M56x4.0 Tap Drill,52,SW
+M52x5.0 Tap Drill,47,SW
+M4x0.7 Tap Drill,3.3,SW
+M48x5.0 Tap Drill,43,SW
+M48x3.0 Tap Drill,45,SW
+M45x4.5 Tap Drill,40.5,SW
+M45x1.5 Tap Drill,43.5,SW
+M42x4.5 Tap Drill,37.5,SW
+M42x3.0 Tap Drill,39,SW
+M3x0.5 Tap Drill,2.5,SW
+M39x4.0 Tap Drill,35,SW
+M39x3.0 Tap Drill,36,SW
+M39x2.0 Tap Drill,37,SW
+M36x4.0 Tap Drill,32,SW
+M36x3.0 Tap Drill,33,SW
+M36x2.0 Tap Drill,34,SW
+M33x3.5 Tap Drill,29.5,SW
+M33x2.0 Tap Drill,31,SW
+M30x3.5 Tap Drill,26.5,SW
+M30x2.0 Tap Drill,28,SW
+M3.5x0.6 Tap Drill,2.9,SW
+M2x0.4 Tap Drill,1.6,SW
+M27x3.0 Tap Drill,24,SW
+M27x2.0 Tap Drill,25,SW
+M24x3.0 Tap Drill,21,SW
+M24x2.0 Tap Drill,22,SW
+M22x2.5 Tap Drill,19.5,SW
+M22x2.0 Tap Drill,20,SW
+M22x1.5 Tap Drill,20.5,SW
+M20x2.5 Tap Drill,17.5,SW
+M20x2.0 Tap Drill,18,SW
+M20x1.5 Tap Drill,18.5,SW
+M2.5x0.45 Tap Drill,2.05,SW
+M2.2x0.45 Tap Drill,1.75,SW
+M18x2.5 Tap Drill,15.5,SW
+M18x2.0 Tap Drill,16,SW
+M18x1.5 Tap Drill,16.5,SW
+M16x2.0 Tap Drill,14,SW
+M16x1.5 Tap Drill,14.5,SW
+M14x2.0 Tap Drill,12,SW
+M14x1.5 Tap Drill,12.5,SW
+M12x1.75 Tap Drill,10.2,SW
+M12x1.5 Tap Drill,10.5,SW
+M12x1.25 Tap Drill,10.8,SW
+M10x1.5 Tap Drill,8.5,SW
+M10x1.25 Tap Drill,8.8,SW
+M10x1.0 Tap Drill,9,SW
+M100x6.0 Tap Drill,94,SW
+M100x4.0 Tap Drill,96,SW
+M1.6x0.35 Tap Drill,1.25,SW
+M1.4x0.3 Tap Drill,1.1,SW
+M1.2x0.25 Tap Drill,0.95,SW
+M10 Helicoil Tap Drill,10.25,SW
+M10 Helicoil Tap Drill,10.25,SW
+M10 Helicoil Tap Drill,10.5,SW
+M12 Helicoil Tap Drill,12.25,SW
+M12 Helicoil Tap Drill,12.25,SW
+M12 Helicoil Tap Drill,12.5,SW
+M14 Helicoil Tap Drill,14.25,SW
+M14 Helicoil Tap Drill,14.5,SW
+M16 Helicoil Tap Drill,16.25,SW
+M16 Helicoil Tap Drill,16.5,SW
+M18 Helicoil Tap Drill,18.25,SW
+M18 Helicoil Tap Drill,18.5,SW
+M18 Helicoil Tap Drill,18.75,SW
+M2.2 Helicoil Tap Drill,2.3,SW
+M2.5 Helicoil Tap Drill,2.55,SW
+M20 Helicoil Tap Drill,20.25,SW
+M20 Helicoil Tap Drill,20.5,SW
+M20 Helicoil Tap Drill,20.75,SW
+M22 Helicoil Tap Drill,22.25,SW
+M22 Helicoil Tap Drill,22.5,SW
+M22 Helicoil Tap Drill,22.75,SW
+M24 Helicoil Tap Drill,24.5,SW
+M24 Helicoil Tap Drill,24.75,SW
+M27 Helicoil Tap Drill,27.5,SW
+M27 Helicoil Tap Drill,27.75,SW
+M3.5 Helicoil Tap Drill,3.7,SW
+M30 Helicoil Tap Drill,30.5,SW
+M30 Helicoil Tap Drill,31,SW
+M33 Helicoil Tap Drill,33.5,SW
+M33 Helicoil Tap Drill,34,SW
+M36 Helicoil Tap Drill,36.5,SW
+M36 Helicoil Tap Drill,37,SW
+M36 Helicoil Tap Drill,37,SW
+M39 Helicoil Tap Drill,39.5,SW
+M39 Helicoil Tap Drill,40,SW
+M39 Helicoil Tap Drill,40,SW
+M3 Helicoil Tap Drill,3.15,SW
+M4 Helicoil Tap Drill,4.2,SW
+M5 Helicoil Tap Drill,5.2,SW
+M6 Helicoil Tap Drill,6.25,SW
+M7 Helicoil Tap Drill,7.25,SW
+M8 Helicoil Tap Drill,8.25,SW
+M8 Helicoil Tap Drill,8.3,SW
+M1.6 Close Fit Drill,1.7,SW
+M10 Close Fit Drill,10.5,SW
+M100 Close Fit Drill,104,SW
+M12 Close Fit Drill,13,SW
+M13 Close Fit Drill,14,SW
+M14 Close Fit Drill,15,SW
+M16 Close Fit Drill,17,SW
+M18 Close Fit Drill,19,SW
+M2 Close Fit Drill,2.2,SW
+M2.5 Close Fit Drill,2.7,SW
+M20 Close Fit Drill,21,SW
+M22 Close Fit Drill,23,SW
+M24 Close Fit Drill,25,SW
+M25 Close Fit Drill,26,SW
+M27 Close Fit Drill,28,SW
+M3 Close Fit Drill,3.2,SW
+M3.5 Close Fit Drill,3.7,SW
+M30 Close Fit Drill,31,SW
+M33 Close Fit Drill,34,SW
+M36 Close Fit Drill,37,SW
+M39 Close Fit Drill,40,SW
+M4 Close Fit Drill,4.3,SW
+M42 Close Fit Drill,43,SW
+M45 Close Fit Drill,46,SW
+M48 Close Fit Drill,50,SW
+M5 Close Fit Drill,5.3,SW
+M52 Close Fit Drill,54,SW
+M56 Close Fit Drill,58,SW
+M6 Close Fit Drill,6.4,SW
+M6.5 Close Fit Drill,6.9,SW
+M64 Close Fit Drill,66,SW
+M7 Close Fit Drill,7.4,SW
+M72 Close Fit Drill,74,SW
+M8 Close Fit Drill,8.4,SW
+M80 Close Fit Drill,82,SW
+M90 Close Fit Drill,93,SW
+M1.6 Normal Fit Drill,1.8,SW
+M10 Normal Fit Drill,11,SW
+M100 Normal Fit Drill,107,SW
+M12 Normal Fit Drill,13.5,SW
+M13 Normal Fit Drill,14.5,SW
+M14 Normal Fit Drill,15.5,SW
+M16 Normal Fit Drill,17.5,SW
+M18 Normal Fit Drill,20,SW
+M2 Normal Fit Drill,2.4,SW
+M2.5 Normal Fit Drill,2.9,SW
+M20 Normal Fit Drill,22,SW
+M22 Normal Fit Drill,24,SW
+M24 Normal Fit Drill,26,SW
+M25 Normal Fit Drill,27,SW
+M27 Normal Fit Drill,30,SW
+M3 Normal Fit Drill,3.4,SW
+M3.5 Normal Fit Drill,3.9,SW
+M30 Normal Fit Drill,33,SW
+M33 Normal Fit Drill,36,SW
+M36 Normal Fit Drill,39,SW
+M39 Normal Fit Drill,42,SW
+M4 Normal Fit Drill,4.5,SW
+M42 Normal Fit Drill,45,SW
+M45 Normal Fit Drill,48,SW
+M48 Normal Fit Drill,52,SW
+M5 Normal Fit Drill,5.5,SW
+M52 Normal Fit Drill,56,SW
+M56 Normal Fit Drill,62,SW
+M6 Normal Fit Drill,6.6,SW
+M6.5 Normal Fit Drill,7.1,SW
+M64 Normal Fit Drill,70,SW
+M7 Normal Fit Drill,7.6,SW
+M72 Normal Fit Drill,78,SW
+M8 Normal Fit Drill,9,SW
+M80 Normal Fit Drill,86,SW
+M90 Normal Fit Drill,96,SW
+M1.6 Loose Fit Drill,2,SW
+M10 Loose Fit Drill,12,SW
+M100 Loose Fit Drill,112,SW
+M12 Loose Fit Drill,15,SW
+M13 Loose Fit Drill,16,SW
+M14 Loose Fit Drill,17,SW
+M16 Loose Fit Drill,19,SW
+M18 Loose Fit Drill,21,SW
+M2 Loose Fit Drill,2.6,SW
+M2.5 Loose Fit Drill,3.1,SW
+M20 Loose Fit Drill,24,SW
+M22 Loose Fit Drill,26,SW
+M24 Loose Fit Drill,28,SW
+M25 Loose Fit Drill,29,SW
+M27 Loose Fit Drill,32,SW
+M3 Loose Fit Drill,3.6,SW
+M3.5 Loose Fit Drill,4.2,SW
+M30 Loose Fit Drill,35,SW
+M33 Loose Fit Drill,38,SW
+M36 Loose Fit Drill,42,SW
+M39 Loose Fit Drill,45,SW
+M4 Loose Fit Drill,4.8,SW
+M42 Loose Fit Drill,48,SW
+M45 Loose Fit Drill,52,SW
+M48 Loose Fit Drill,56,SW
+M5 Loose Fit Drill,5.8,SW
+M52 Loose Fit Drill,62,SW
+M56 Loose Fit Drill,66,SW
+M6 Loose Fit Drill,7,SW
+M6.5 Loose Fit Drill,7.5,SW
+M64 Loose Fit Drill,74,SW
+M7 Loose Fit Drill,8,SW
+M72 Loose Fit Drill,82,SW
+M8 Loose Fit Drill,10,SW
+M80 Loose Fit Drill,91,SW
+M90 Loose Fit Drill,101,SW
+#1-64 Helicoil Tap Drill,1.9939,SW
+#10-24 Helicoil Tap Drill,5.15874,SW
+#10-32 Helicoil Tap Drill,5.1054,SW
+#12-24 Helicoil Tap Drill,5.7912,SW
+#2-56 Helicoil Tap Drill,2.38252,SW
+#2-64 Helicoil Tap Drill,2.38252,SW
+#3-48 Helicoil Tap Drill,2.7051,SW
+#3-56 Helicoil Tap Drill,2.6416,SW
+#4-40 Helicoil Tap Drill,3.048,SW
+#4-48 Helicoil Tap Drill,3.048,SW
+#5-40 Helicoil Tap Drill,3.4544,SW
+#6-32 Helicoil Tap Drill,3.7338,SW
+#6-40 Helicoil Tap Drill,3.7338,SW
+#8-32 Helicoil Tap Drill,4.3942,SW
+#8-36 Helicoil Tap Drill,4.3942,SW
+1in-12 Helicoil Tap Drill,25.79624,SW
+1in-14 Helicoil Tap Drill,25.79624,SW
+1in-8 Helicoil Tap Drill,26.19248,SW
+1.5in-12 Helicoil Tap Drill,38.49624,SW
+1.5in-6 Helicoil Tap Drill,39.29126,SW
+1.25in-12 Helicoil Tap Drill,32.14624,SW
+1.25in-7 Helicoil Tap Drill,32.94126,SW
+1.125in-12 Helicoil Tap Drill,28.97124,SW
+1.125in-7 Helicoil Tap Drill,29.76626,SW
+1.375in-12 Helicoil Tap Drill,35.32124,SW
+1.375in-6 Helicoil Tap Drill,36.11626,SW
+0.5in-13 Helicoil Tap Drill,13.09624,SW
+0.5in-20 Helicoil Tap Drill,13.09624,SW
+0.25in-20 Helicoil Tap Drill,6.7564,SW
+0.25in-28 Helicoil Tap Drill,6.6294,SW
+0.75in-10 Helicoil Tap Drill,19.84248,SW
+0.75in-16 Helicoil Tap Drill,19.44624,SW
+0.375in-16 Helicoil Tap Drill,10.0838,SW
+0.375in-24 Helicoil Tap Drill,9.92124,SW
+0.3125in-18 Helicoil Tap Drill,8.4328,SW
+0.3125in-24 Helicoil Tap Drill,8.33374,SW
+0.625in-11 Helicoil Tap Drill,16.66748,SW
+0.625in-18 Helicoil Tap Drill,16.27124,SW
+0.4375in-14 Helicoil Tap Drill,11.50874,SW
+0.4375in-20 Helicoil Tap Drill,11.50874,SW
+0.875in-14 Helicoil Tap Drill,22.62124,SW
+0.875in-9 Helicoil Tap Drill,23.01748,SW
+0.5625in-12 Helicoil Tap Drill,14.68374,SW
+0.5625in-18 Helicoil Tap Drill,14.68374,SW
+#0-80 Tap Drill,1.19126,SW
+#00-90 Tap Drill,0.9144,SW
+#00-96 Tap Drill,0.9398,SW
+#000-120 Tap Drill,0.6604,SW
+#0000-160 Tap Drill,0.3683,SW
+#1-64 Tap Drill,1.5113,SW
+#1-72 Tap Drill,1.5113,SW
+#10-24 Tap Drill,3.7973,SW
+#10-32 Tap Drill,4.0386,SW
+#12-24 Tap Drill,4.4958,SW
+#12-28 Tap Drill,4.6228,SW
+#2-56 Tap Drill,1.778,SW
+#2-64 Tap Drill,1.778,SW
+#3-48 Tap Drill,1.9939,SW
+#3-56 Tap Drill,2.0828,SW
+#4-40 Tap Drill,2.2606,SW
+#4-48 Tap Drill,2.3749,SW
+#5-40 Tap Drill,2.5781,SW
+#5-44 Tap Drill,2.6416,SW
+#6-32 Tap Drill,2.7051,SW
+#6-40 Tap Drill,2.8702,SW
+#8-32 Tap Drill,3.4544,SW
+#8-36 Tap Drill,3.4544,SW
+1-1/2-12 Tap Drill,36.11626,SW
+1-1/2-6 Tap Drill,34.13252,SW
+1-1/4-12 Tap Drill,29.76626,SW
+1-1/4-7 Tap Drill,28.17876,SW
+1-1/8-12 Tap Drill,26.59126,SW
+1-1/8-7 Tap Drill,25.00376,SW
+1in-12 Tap Drill,23.41626,SW
+1in-14 Tap Drill,23.8125,SW
+1-3/4-12 Tap Drill,42.5069,SW
+1-3/4-16 Tap Drill,42.9895,SW
+1-3/4-5 Tap Drill,39.6875,SW
+1-3/8-12 Tap Drill,32.94126,SW
+1-3/8-6 Tap Drill,30.95752,SW
+1in-8 Tap Drill,22.225,SW
+1/2-13 Tap Drill,10.71626,SW
+1/2-20 Tap Drill,11.50874,SW
+1/4-20 Tap Drill,5.1054,SW
+1/4-28 Tap Drill,5.4102,SW
+2-1/2-12 Tap Drill,61.849,SW
+2-1/2-4 Tap Drill,57.3405,SW
+2-1/4-12 Tap Drill,55.2069,SW
+2-1/4-4.5 Tap Drill,51.7144,SW
+2in-12 Tap Drill,48.8569,SW
+2in-16 Tap Drill,49.3395,SW
+2-3/4-12 Tap Drill,67.9069,SW
+2-3/4-4 Tap Drill,63.6905,SW
+2-4.5 Tap Drill,45.24248,SW
+3-1/2-12 Tap Drill,86.9569,SW
+3-1/2-4 Tap Drill,82.7405,SW
+3-1/4-12 Tap Drill,80.6069,SW
+3-1/4-4 Tap Drill,76.3905,SW
+3in-12 Tap Drill,74.2569,SW
+3-3/4-12 Tap Drill,93.3069,SW
+3-3/4-4 Tap Drill,89.0905,SW
+3in-4 Tap Drill,70.0405,SW
+0.75in-10 Tap Drill,16.66748,SW
+0.75in-16 Tap Drill,17.4625,SW
+0.375in-16 Tap Drill,7.9375,SW
+0.375in-24 Tap Drill,8.4328,SW
+4in-12 Tap Drill,99.6569,SW
+4in-4 Tap Drill,95.4405,SW
+0.3125in-18 Tap Drill,6.5278,SW
+0.3125in-24 Tap Drill,6.9088,SW
+0.625in-11 Tap Drill,13.49248,SW
+0.625in-18 Tap Drill,14.68374,SW
+7/16in-14 Tap Drill,9.3472,SW
+7/16in-20 Tap Drill,9.92124,SW
+7/8in-14 Tap Drill,20.6375,SW
+7/8in-9 Tap Drill,19.44624,SW
+9/16in-12 Tap Drill,12.30376,SW
+9/16in-18 Tap Drill,13.09624,SW
+1-5/8-12 Tap Drill,38.9128,SW
+30 UNM Tap Drill,0.2413,SW
+35 UNM Tap Drill,0.2794,SW
+40 UNM Tap Drill,0.3175,SW
+45 UNM Tap Drill,0.3683,SW
+50 UNM Tap Drill,0.39624,SW
+55 UNM Tap Drill,0.44958,SW
+60 UNM Tap Drill,0.48006,SW
+70 UNM Tap Drill,0.55118,SW
+80 UNM Tap Drill,0.635,SW
+90 UNM Tap Drill,0.7112,SW
+100 UNM Tap Drill,0.79248,SW
+110 UNM Tap Drill,0.889,SW
+120 UNM Tap Drill,0.9906,SW
+140 UNM Tap Drill,1.15062,SW
+1-5/8-8 Tap Drill,38.1,SW
+1-7/8-8 Tap Drill,44.45,SW
+1-7/8-8 Tap Drill,45.6819,SW
+#0 Close Fit Drill,1.6129,SW
+#00 Close Fit Drill,1.3208,SW
+#000 Close Fit Drill,0.9398,SW
+#0000 Close Fit Drill,0.6096,SW
+#1 Close Fit Drill,1.9304,SW
+#10 Close Fit Drill,4.9784,SW
+#12 Close Fit Drill,5.6134,SW
+#2 Close Fit Drill,2.2606,SW
+#3 Close Fit Drill,2.6416,SW
+#4 Close Fit Drill,2.9464,SW
+#5 Close Fit Drill,3.2639,SW
+#6 Close Fit Drill,3.6576,SW
+#8 Close Fit Drill,4.3053,SW
+1in Close Fit Drill,25.79624,SW
+1.5in Close Fit Drill,38.49624,SW
+1.25in Close Fit Drill,32.14624,SW
+1.125in Close Fit Drill,28.97124,SW
+1.75in Close Fit Drill,44.84624,SW
+1.375in Close Fit Drill,35.32124,SW
+0.5in Close Fit Drill,13.09624,SW
+0.25in Close Fit Drill,6.5278,SW
+2in Close Fit Drill,51.19624,SW
+2.5in Close Fit Drill,63.89624,SW
+2.25in Close Fit Drill,57.54624,SW
+2.75in Close Fit Drill,70.24624,SW
+3in Close Fit Drill,76.59624,SW
+3.5in Close Fit Drill,89.29624,SW
+3.25in Close Fit Drill,82.94624,SW
+3.75in Close Fit Drill,95.64624,SW
+0.75in Close Fit Drill,19.44624,SW
+0.375in Close Fit Drill,9.8044,SW
+4in Close Fit Drill,101.99624,SW
+0.3125in Close Fit Drill,8.2042,SW
+0.625in Close Fit Drill,16.27124,SW
+0.4375in Close Fit Drill,11.50874,SW
+0.875in Close Fit Drill,22.62124,SW
+0.5625in Close Fit Drill,14.68374,SW
+#0 Normal Fit Drill,1.778,SW
+#00 Normal Fit Drill,1.397,SW
+#000 Normal Fit Drill,1.0414,SW
+#0000 Normal Fit Drill,0.6604,SW
+#1 Normal Fit Drill,2.0574,SW
+#10 Normal Fit Drill,5.1054,SW
+#12 Normal Fit Drill,5.7912,SW
+#2 Normal Fit Drill,2.4384,SW
+#3 Normal Fit Drill,2.794,SW
+#4 Normal Fit Drill,3.2639,SW
+#5 Normal Fit Drill,3.4544,SW
+#6 Normal Fit Drill,3.7973,SW
+#8 Normal Fit Drill,4.4958,SW
+1in Normal Fit Drill,26.19248,SW
+1.5in Normal Fit Drill,38.89248,SW
+1.25in Normal Fit Drill,32.54248,SW
+1.125in Normal Fit Drill,29.36748,SW
+1.75in Normal Fit Drill,45.24248,SW
+1.375in Normal Fit Drill,35.71748,SW
+0.5in Normal Fit Drill,13.49248,SW
+0.25in Normal Fit Drill,6.7564,SW
+2in Normal Fit Drill,51.59248,SW
+2.5in Normal Fit Drill,64.29248,SW
+2.25in Normal Fit Drill,57.94248,SW
+2.75in Normal Fit Drill,70.64248,SW
+3in Normal Fit Drill,76.99248,SW
+3.5in Normal Fit Drill,89.69248,SW
+3.25in Normal Fit Drill,83.34248,SW
+3.75in Normal Fit Drill,96.04248,SW
+0.75in Normal Fit Drill,19.84248,SW
+0.375in Normal Fit Drill,10.0838,SW
+4in Normal Fit Drill,102.39248,SW
+0.3125in Normal Fit Drill,8.4328,SW
+0.625in Normal Fit Drill,16.66748,SW
+0.4375in Normal Fit Drill,11.90498,SW
+0.875in Normal Fit Drill,23.01748,SW
+0.5625in Normal Fit Drill,15.07998,SW
+#0 Loose Fit Drill,1.8542,SW
+#00 Loose Fit Drill,1.5113,SW
+#000 Loose Fit Drill,1.0922,SW
+#0000 Loose Fit Drill,0.7112,SW
+#1 Loose Fit Drill,2.2606,SW
+#10 Loose Fit Drill,5.6134,SW
+#12 Loose Fit Drill,6.2484,SW
+#2 Loose Fit Drill,2.7051,SW
+#3 Loose Fit Drill,3.048,SW
+#4 Loose Fit Drill,3.4544,SW
+#5 Loose Fit Drill,3.9116,SW
+#6 Loose Fit Drill,4.3053,SW
+#8 Loose Fit Drill,4.9149,SW
+1in Loose Fit Drill,26.59126,SW
+1.5in Loose Fit Drill,39.29126,SW
+1.25in Loose Fit Drill,32.94126,SW
+1.125in Loose Fit Drill,29.76626,SW
+1.75in Loose Fit Drill,45.64126,SW
+1.375in Loose Fit Drill,36.11626,SW
+0.5in Loose Fit Drill,13.89126,SW
+0.25in Loose Fit Drill,7.14248,SW
+2in Loose Fit Drill,51.99126,SW
+2.5in Loose Fit Drill,64.69126,SW
+2.25in Loose Fit Drill,58.34126,SW
+2.75in Loose Fit Drill,71.04126,SW
+3in Loose Fit Drill,77.39126,SW
+3.5in Loose Fit Drill,90.09126,SW
+3.25in Loose Fit Drill,83.74126,SW
+3.75in Loose Fit Drill,96.44126,SW
+0.75in Loose Fit Drill,20.24126,SW
+0.375in Loose Fit Drill,10.31748,SW
+4in Loose Fit Drill,102.79126,SW
+0.3125in Loose Fit Drill,8.72998,SW
+0.625in Loose Fit Drill,17.06626,SW
+0.4375in Loose Fit Drill,12.30376,SW
+0.875in Loose Fit Drill,23.41626,SW
+0.5625in Loose Fit Drill,15.47876,SW
