@@ -65,6 +65,7 @@ def start():
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
     control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
     control.isPromoted = IS_PROMOTED
+    futil.add_handler(ui.activeSelections.add, active_selection_changed, local_handlers=local_handlers)
 
 def stop():
     # Get the various UI elements for this command
@@ -78,6 +79,9 @@ def stop():
 
     if command_definition:
         command_definition.deleteMe()
+
+    # Remove the event handlers
+    local_handlers.clear()
 
 def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
     sels = args.currentSelection
