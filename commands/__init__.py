@@ -2,12 +2,14 @@ from .updateDocSettings import entry as updateDocSettings
 from .cleanChamfer import entry as cleanChamfer
 from .genPanels import entry as genPanels
 from .addHolder import entry as addHolder
+from .colorHoles import entry as colorHoles
 from .settings import entry as settings
 
 commands = [
     updateDocSettings,
     cleanChamfer,
     addHolder,
+    colorHoles,
     settings
 ]
 

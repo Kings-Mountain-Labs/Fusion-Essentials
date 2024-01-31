@@ -104,7 +104,7 @@ def input_changed_handler(args: adsk.core.InputChangedEventArgs):
             module_settings[setting_key]["default"] = changed_input.value
 
         # Save the modified settings back
-        shared_state.save_settings(module_name, {"settings": module_settings})
+        shared_state.save_settings(module_name, module_settings)
 
     except:
         ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
