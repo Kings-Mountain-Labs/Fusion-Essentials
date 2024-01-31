@@ -71,6 +71,9 @@ def start():
     control.isPromoted = IS_PROMOTED
     futil.add_handler(ui.activeSelectionChanged, active_selection_changed)
     futil.add_handler(app.documentActivated, document_changed)
+    global _custom_graphics_group
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
 
 def stop():
     # Get the various UI elements for this command
@@ -114,7 +117,7 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
             else:
                 name = posSize[0]
                 for n in posSize[1:]:
-                    name = f"{name}\nor\n{n}"
+                    name = f"{name}\n{n}"
             # Now display it using a 2D ui element
             billboard = adsk.fusion.CustomGraphicsBillBoard.create(Point3D.create(0, 0, 0))
             clear_graphics()
@@ -122,6 +125,8 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
             # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
             # custom_text.color = adsk.core.Color.create(0, 0, 0, 1)
             custom_text.billBoarding = billboard
+            custom_text.isSelectable = False
+            custom_text.depthPriority = 1
         else:
             clear_graphics()
     else:
@@ -129,8 +134,9 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
 
 def clear_graphics():
     global _custom_graphics_group
-    for graphic in range(_custom_graphics_group.count):
-        _custom_graphics_group.item(graphic).deleteMe()
+    if _custom_graphics_group:
+        for graphic in range(_custom_graphics_group.count):
+            _custom_graphics_group.item(graphic).deleteMe()
 
 def command_created(args: adsk.core.CommandCreatedEventArgs):
     # General logging for debug.
