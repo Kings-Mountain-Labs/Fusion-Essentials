@@ -459,7 +459,10 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     # Step 1: Boolean the part from the jaw
     # Step 2: Collect all the surfaces that the boolean generated
     # Step 3: Preprocess and remove clearance any shitty geometry
-    # Step 3.1: Replace all Z-axis toroids with a cylindrical counterbore
+    # Step 3.1: Replace all Z-axis toroids or inward facing cones or horizontal cylinders (fillet) or face we think is part of a chamfer with a counterbore or large chamfer
+    # Step 3.2: Remove all exterior facing toroids, cones, or spheres
+    # Step 3.3: Option to remove ale exterior facing cylinders
+    # Step 3.4: Option to clearance inward or outward facing cylinders
     # Step 4: Project each of the faces onto the sketch plane
     # Step 5: Do a extruded cut from the projection on the plane to the face with a through body extent
     # Step 6: Remove non flat floor faces
@@ -468,7 +471,28 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     # Step 7.2: Create a dogbone sketch on the top plane
     # Step 7.3: Extrude the dogbone sketch to the bottom of the edge
 
-    # Step 1
+    booleans = new_component.features.combineFeatures
+    # Now the following will be done once for each jaw
+    bodies_oc = adsk.core.ObjectCollection.create()
+    for body in bodies:
+        bodies_oc.add(body)
+    for jaw_body in jaw_bodies.bodies:
+        # Step 0 - get the tokens for all the original faces of the jaw body
+        jaw_faces = jaw_body.faces
+        jaw_face_tokens = [jaw_face.entityToken for jaw_face in jaw_faces]
+        # Step 1
+        boolean_input = booleans.createInput(jaw_body, bodies_oc)
+        boolean_input.operation = adsk.fusion.FeatureOperations.CutFeatureOperation
+        combi_feature = booleans.add(boolean_input)
+        # Step 2 - get the tokens for all the new faces of the jaw body
+        new_jaw_faces = combi_feature.faces
+        # Step 3 - remove or clearance shitty geometry
+        faces_to_relieve: List[BRepFace] = []
+        for face in new_jaw_faces:
+            if face.objectType == adsk.fusion.BRepCylinder.classType():
+                pass
+
+
     
 
 def generate_bounding_box_with_face(bodies: List[BRepBody], face: BRepFace, theta: float) -> PartDatum:
