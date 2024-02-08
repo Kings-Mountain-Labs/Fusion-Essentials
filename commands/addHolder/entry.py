@@ -7,6 +7,7 @@ import time
 import random
 from typing import List
 import math
+from adsk.cam import ToolLibrary, Tool
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -125,7 +126,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
 
     tool = generate_tool(tool_profile, name, prodid, prodlink)
 
-    futil.log(f'Tool:\n{json.dumps(tool, indent=4)}')
+    futil.log(f'Tool:\n{tool.toJson()}')
 
     # Get the selected library
     library_input: adsk.core.DropDownCommandInput = inputs.itemById('library')
@@ -140,12 +141,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     libraryManager = camManager.libraryManager
     toolLibraries = libraryManager.toolLibraries
     library = toolLibraries.toolLibraryAtURL(library_url)
-    current_lib = json.loads(library.toJson())
-    try:
-        current_lib['data'].append(tool)
-    except KeyError:
-        current_lib['data'] = [tool]
-    library = adsk.cam.ToolLibrary.createFromJson(json.dumps(current_lib))
+    library.add(tool)
     success = toolLibraries.updateToolLibrary(library_url, library)
     if success:
         futil.log('Tool added to library successfully')
@@ -453,7 +449,7 @@ def format_library_names(libraries: List) -> List:
         formatted_libraries.append(library.split('/')[-1])
     return formatted_libraries
 
-def generate_tool(profile, desc, prodid, prodlink):
+def generate_tool(profile, desc, prodid, prodlink) -> Tool:
     guid = "00000000-0000-0000-0000-" + str(random.randint(100000000000,999999999999))
     data = {
         "description": desc,
@@ -475,4 +471,4 @@ def generate_tool(profile, desc, prodid, prodlink):
             "upper-diameter": round(segment[3]*10*2, 3)
         }
         data["segments"].append(seg)
-    return data
+    return Tool.createFromJson(json.dumps(data))
