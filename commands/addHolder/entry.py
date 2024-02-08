@@ -100,7 +100,6 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
 def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug
-    futil.log(f'{CMD_NAME} Command Execute Event')
     inputs = args.command.commandInputs
     # Get the selected body
     body_input: adsk.core.SelectionCommandInput = inputs.itemById('body')
@@ -126,7 +125,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
 
     tool = generate_tool(tool_profile, name, prodid, prodlink)
 
-    futil.log(f'Tool:\n{tool}')
+    futil.log(f'Tool:\n{json.dumps(tool, indent=4)}')
 
     # Get the selected library
     library_input: adsk.core.DropDownCommandInput = inputs.itemById('library')
@@ -156,12 +155,6 @@ def command_execute(args: adsk.core.CommandEventArgs):
 # This function will be called when the command needs to compute a new preview in the graphics window
 def command_preview(args: adsk.core.CommandEventArgs):
     inputs = args.command.commandInputs
-    # Hide the highlights for the selection inputs that are not active
-    # sel_inps: List[adsk.core.SelectionCommandInput] = [inputs.itemById('body'), inputs.itemById('axis'), inputs.itemById('end_face')]
-    # for sel_inp in sel_inps:
-    #     if sel_inp.isEnabled:
-    #         for i in range(0, sel_inp.selectionCount):
-    #             sel_inp.selection(i).entity
 
 def command_preselect(args: adsk.core.SelectionEventArgs):
     # if the user is selecting the end face then we need to check to see if the axis is valid
@@ -198,15 +191,12 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     elif changed_input.id == 'axis':
         end_face_input.isVisible = False
         end_face_input.clearSelection()
-    futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
 
 # This event handler is called when the command terminates.
 def command_destroy(args: adsk.core.CommandEventArgs):
     global local_handlers
     local_handlers = []
     futil.log(f'{CMD_NAME} Command Destroy Event')
-
-# NOTE: for these I can check to see if it is sketch geometry and then get the world geometry from it before checking the instance type
 
 def get_axis(axis_base: adsk.core.Base) -> adsk.core.InfiniteLine3D:
     # if it is a BRepFace then we need to get the geometry from it
@@ -485,4 +475,4 @@ def generate_tool(profile, desc, prodid, prodlink):
             "upper-diameter": round(segment[3]*10*2, 3)
         }
         data["segments"].append(seg)
-    return json.dumps(data, indent=4)
+    return data
