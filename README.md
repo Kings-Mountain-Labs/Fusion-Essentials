@@ -6,7 +6,7 @@ You have a few options for installing Fusion Essentials. The easiest way is to d
 If you are familiar with git, you can clone the repo into your add-ins folder.
 
 ## Features
-1. **Add Holder** This command provides a quick way to add a toolholder to the tool library (although at the moment I am still working out how to save it into the tool library), currently it only supports single body toolholders (this will be fixed in the future).
+1. **Add Holder** This command provides a quick way to add a toolholder to the tool library, currently it only supports single body toolholders (this will be fixed in the future).
 2. **Clean Chamfer** This command will take a set of surfaces that form a existing chamfer and turn them into a single freeform surface with the isocurves aligned to the original surfaces. This is useful for interpolating chamfers with a ball endmill, although it is made largely obsolete by the Pencil operation.
 3. **Automatically Enable Design History** This command will automatically enable design history for for what it perceives to be a newly imported file.
 4. **Automatically Switch Units** This command will automatically switch the units of a newly imported file to the units of the current document.
