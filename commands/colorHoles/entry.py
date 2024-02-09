@@ -74,7 +74,10 @@ def start():
     futil.add_handler(app.documentActivated, document_changed)
     global _custom_graphics_group
     design = adsk.fusion.Design.cast(app.activeProduct)
-    _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
+    try:
+        _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
+    except:
+        futil.log("Could not create custom graphics group")
 
 def stop():
     # Get the various UI elements for this command

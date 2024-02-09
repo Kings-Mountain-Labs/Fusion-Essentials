@@ -4,12 +4,14 @@ from .genPanels import entry as genPanels
 from .addHolder import entry as addHolder
 from .colorHoles import entry as colorHoles
 from .settings import entry as settings
+from .relinkLibraries import entry as relinkLibraries
 
 commands = [
     updateDocSettings,
     cleanChamfer,
     addHolder,
     colorHoles,
+    relinkLibraries,
     settings
 ]
 
