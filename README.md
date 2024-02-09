@@ -12,6 +12,7 @@ If you are familiar with git, you can clone the repo into your add-ins folder.
 4. **Automatically Switch Units** This command will automatically switch the units of a newly imported file to the units of the current document.
 5. **Ability to Change Settings** You can enable/disable or change the default units and the settings will persist between sessions. There is no gurantee that they will persist over updates of the add-in, until a 1.0 release is made.
 6. **Color Holes** This command will color all same sized holes in a part and tell you what nominal size they might be based on the defaults in common CAD software.
+7. **Relink Libraries** This command in the Manufacturing workspace will replace tools in you document with identical tools form a library that they have lost their link to.
 
 ## License
 
