@@ -13,9 +13,9 @@ from hashlib import sha256
 app = adsk.core.Application.get()
 ui: adsk.core.UserInterface = app.userInterface
 
-CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_RelinkLibraries'
-CMD_NAME = 'Relink Tool Libraries'
-CMD_Description = 'Relink tools to their tool library'
+CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_Update_Tools_from_Libraries'
+CMD_NAME = 'Update Tools from Libraries'
+CMD_Description = 'Update Tools from Tool Library'
 IS_PROMOTED = True
 
 WORKSPACE_ID = 'CAMEnvironment'
@@ -34,6 +34,7 @@ def start():
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
     control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
+    control.isPromoted = IS_PROMOTED
 
 def stop():
     # Get the various UI elements for this command
@@ -58,7 +59,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     inputs = args.command.commandInputs
 
     # Select the setup/s to be relinked
-    setup_input = inputs.addSelectionInput('setups', 'Setup(s) to Link', 'Select the setups that you would like relinked.')
+    setup_input = inputs.addSelectionInput('setups', 'Setup(s) to Update', 'Select the setups that you would like relinked.')
     setup_input.setSelectionLimits(1, 0)
 
     # Make a drop down for correlation type
@@ -72,7 +73,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     # Get the list of tooling libraries
     libraries = get_tooling_libraries()
     # Format the list of libraries for display in the drop down
-    library_input.tooltipDescription = 'Select the tool library you would like to link to.'
+    library_input.tooltipDescription = 'Select the tool library you would like to replace from.'
     formatted_libraries = format_library_names(libraries)
     for library in formatted_libraries:
         library_input.listItems.add(library, True)
@@ -106,6 +107,7 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
     library_tool_description: Dict[str, adsk.cam.Tool] = {}
     library_tool_product_ids: Dict[str, adsk.cam.Tool] = {}
     library_tool_geometry_hash: Dict[str, adsk.cam.Tool] = {}
+    bad_correlation = False
     for i in range(library.count):
         tool: adsk.cam.Tool = library.item(i)
         tool_json = json.loads(tool.toJson())
@@ -152,10 +154,14 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
             else:
                 print_str += f'\t Preset: {preset_name} not found in library tool'
                 futil.log(f"{json.dumps(presets)}\n{preset_descriptions}")
+                bad_correlation = True
         else:
             print_str += f'\t No Match Found'
+            bad_correlation = True
         
         futil.log(print_str)
+    if bad_correlation:
+        ui.messageBox(f'Some tools could not be correlated to the library.\nCheck the Text Command Panel for details.')
     
 
 def command_preselect(args: adsk.core.SelectionEventArgs):
