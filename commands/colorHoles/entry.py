@@ -100,9 +100,21 @@ def document_changed(args: adsk.core.DocumentEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Document Changed Event')
     global _custom_graphics_group
+    _custom_graphics_group = None
     design = adsk.fusion.Design.cast(app.activeProduct)
-    _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
+    if design is not None:
+        _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
+    else:
+        futil.log("DC: Could not create custom graphics group")
 
+def try_create_custom_graphics_group():
+    global _custom_graphics_group
+    _custom_graphics_group = None
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    if design is not None:
+        _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
+    else:
+        futil.log("TCGG: Could not create custom graphics group")
 
 def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
     selections = args.currentSelection
@@ -126,12 +138,16 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
             billboard = adsk.fusion.CustomGraphicsBillBoard.create(Point3D.create(0, 0, 0))
             clear_graphics()
             mat = best_display_point(ent, cylinder_face)
-            custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.25, mat)
-            # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
-            # custom_text.color = adsk.core.Color.create(0, 0, 0, 1)
-            custom_text.billBoarding = billboard
-            custom_text.isSelectable = False
-            custom_text.depthPriority = 1
+            if _custom_graphics_group is not None:
+                custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.25, mat)
+                # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
+                # custom_text.color = adsk.core.Color.create(0, 0, 0, 1)
+                custom_text.billBoarding = billboard
+                custom_text.isSelectable = False
+                custom_text.depthPriority = 1
+            else:
+                futil.log("Could not create custom graphics group")
+                try_create_custom_graphics_group()
         else:
             clear_graphics()
     else:
