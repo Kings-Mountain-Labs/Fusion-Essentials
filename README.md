@@ -10,7 +10,7 @@ If you are familiar with git, you can clone the repo into your add-ins folder.
 2. **Clean Chamfer** This command will take a set of surfaces that form a existing chamfer and turn them into a single freeform surface with the isocurves aligned to the original surfaces. This is useful for interpolating chamfers with a ball endmill, although it is made largely obsolete by the Pencil operation.
 3. **Automatically Enable Design History** This command will automatically enable design history for for what it perceives to be a newly imported file.
 4. **Automatically Switch Units** This command will automatically switch the units of a newly imported file to the units of the current document.
-5. **Ability to Change Settings** You can enable/disable or change the default units and the settings will persist between sessions. There is no gurantee that they will persist over updates of the add-in, until a 1.0 release is made.
+5. **Ability to Change Settings** You can enable/disable or change the default units and the settings will persist between sessions. There is no guarantee that they will persist over updates of the add-in, until a 1.0 release is made.
 6. **Color Holes** This command will color all same sized holes in a part and tell you what nominal size they might be based on the defaults in common CAD software.
 7. **Update Tools from Library** This command in the Manufacturing workspace will replace tools in you document with identical tools form a library that they came from.
 
