@@ -118,7 +118,12 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
         operation: adsk.cam.Operation
         tool = operation.tool
         tool_json = json.loads(tool.toJson()) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
-        # futil.log(f'Tool: {tool_json}')
+        preset_name: str
+        if operation.toolPreset is None:
+            preset_name = ''
+        else:
+            preset_name = operation.toolPreset.name
+        # futil.log(f'Tool: {json.dumps(tool_json)}')
         print_str = f'Operation: {operation.name}'
         # pad the string to 32 characters
         print_str += ' ' * (32 - len(operation.name))
@@ -138,8 +143,18 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
         if library_tool:
             print_str += f'\t Found Match'
             operation.tool = library_tool
+            presets = json.loads(library_tool.toJson())['start-values']['presets']
+            preset_descriptions = [preset['name'] for preset in presets]
+            if preset_name in preset_descriptions:
+                items = library_tool.presets.itemsByName(preset_name)
+                operation.toolPreset = items[0]
+                print_str += f'\t Preset: {preset_name} successfully set'
+            else:
+                print_str += f'\t Preset: {preset_name} not found in library tool'
+                futil.log(f"{json.dumps(presets)}\n{preset_descriptions}")
         else:
             print_str += f'\t No Match Found'
+        
         futil.log(print_str)
     
 
