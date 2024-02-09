@@ -5,9 +5,10 @@ from ...lib import fusion360utils as futil
 from ... import config
 import time
 import random
-from typing import List
+from typing import List, Dict
 import math
 from adsk.cam import ToolLibrary, Tool
+from hashlib import sha256
 
 app = adsk.core.Application.get()
 ui: adsk.core.UserInterface = app.userInterface
@@ -31,10 +32,6 @@ def start():
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
     futil.add_handler(cmd_def.commandCreated, command_created)
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
-    # for i in range(workspace.toolbarTabs.count):
-    #     futil.log(f'Tab: {workspace.toolbarTabs.item(i).id}')
-    # for i in range(workspace.toolbarPanels.count):
-    #     futil.log(f'Panel: {workspace.toolbarPanels.item(i).id}')
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
     control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
 
@@ -55,8 +52,6 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Created Event')
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
-    futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
-    futil.add_handler(args.command.executePreview, command_preview, local_handlers=local_handlers)
     futil.add_handler(args.command.preSelect, command_preselect, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
@@ -64,16 +59,13 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # Select the setup/s to be relinked
     setup_input = inputs.addSelectionInput('setups', 'Setup(s) to Link', 'Select the setups that you would like relinked.')
-    # setup_input.selectionFilters = ['SolidBodies']
     setup_input.setSelectionLimits(1, 0)
 
-    
-
-    prodid_input = inputs.addStringValueInput('prodid', 'Product ID', 'Enter the product ID.')
-    prodid_input.value = ""
-
-    prodlink_input = inputs.addStringValueInput('prodlink', 'Product Link', 'Enter the link to the product page.')
-    prodlink_input.value = ""
+    # Make a drop down for correlation type
+    correlation_input = inputs.addDropDownCommandInput('correlation', 'Correlation Type', adsk.core.DropDownStyles.TextListDropDownStyle)
+    correlation_input.listItems.add('Description', True)
+    correlation_input.listItems.add('Product ID', False)
+    correlation_input.listItems.add('Geometry', False)
 
     # Option to select which tooling library to use
     library_input = inputs.addDropDownCommandInput('library', 'Library', adsk.core.DropDownStyles.TextListDropDownStyle)
@@ -83,7 +75,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     library_input.tooltipDescription = 'Select the tool library you would like to link to.'
     formatted_libraries = format_library_names(libraries)
     for library in formatted_libraries:
-        library_input.listItems.add(library, False)
+        library_input.listItems.add(library, True)
     # print them to the console for debug
     futil.log(f'Available libraries: {libraries}')
 
@@ -92,52 +84,77 @@ def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug
     inputs = args.command.commandInputs
     setup_input: adsk.core.SelectionCommandInput = inputs.itemById('setups')
+    correlation_input: adsk.core.DropDownCommandInput = inputs.itemById('correlation')
+    correlation_type = correlation_input.selectedItem.name
+    library_input: adsk.core.DropDownCommandInput = inputs.itemById('library')
+    camManager = adsk.cam.CAMManager.get()
+    libraryManager = camManager.libraryManager
+    toolLibraries = libraryManager.toolLibraries
+    libraries = get_tooling_libraries()
+    formatted_libraries = format_library_names(libraries)
+    library_index = formatted_libraries.index(library_input.selectedItem.name)
+    library_url = adsk.core.URL.create(libraries[library_index])
+    library = toolLibraries.toolLibraryAtURL(library_url)
+
     for setup_ind in range(setup_input.selectionCount):
-        setup = setup_input.selection(setup_ind).entity
+        setup: adsk.cam.Setup = setup_input.selection(setup_ind).entity
+        replace_with_library_tool(setup, library, correlation_type)
         futil.log(f'Setup: {setup.name} {setup.classType()}')
-        
 
-
-# This function will be called when the command needs to compute a new preview in the graphics window
-def command_preview(args: adsk.core.CommandEventArgs):
-    inputs = args.command.commandInputs
+def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibrary, correlation_type: str):
+    # Iterate through each operation in the setup and replace the tool with the library tool
+    library_tool_description: Dict[str, adsk.cam.Tool] = {}
+    library_tool_product_ids: Dict[str, adsk.cam.Tool] = {}
+    library_tool_geometry_hash: Dict[str, adsk.cam.Tool] = {}
+    for i in range(library.count):
+        tool: adsk.cam.Tool = library.item(i)
+        tool_json = json.loads(tool.toJson())
+        library_tool_description[tool_json["description"]] = tool
+        library_tool_product_ids[tool_json["product-id"]] = tool
+        geometry = json.dumps(tool_json["geometry"])
+        geometry_hash = sha256(geometry.encode()).hexdigest()
+        library_tool_geometry_hash[geometry_hash] = tool
+    for operation in setup.allOperations:
+        operation: adsk.cam.Operation
+        tool = operation.tool
+        tool_json = json.loads(tool.toJson()) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
+        # futil.log(f'Tool: {tool_json}')
+        print_str = f'Operation: {operation.name}'
+        # pad the string to 32 characters
+        print_str += ' ' * (32 - len(operation.name))
+        if correlation_type == 'Description':
+            description = tool_json["description"]
+            print_str += f'matching by Description: {description}'
+            library_tool = library_tool_description.get(description)
+        elif correlation_type == 'Product ID':
+            product_id = tool_json["product-id"]
+            print_str += f'matching by Product ID: {product_id}'
+            library_tool = library_tool_product_ids.get(product_id)
+        elif correlation_type == 'Geometry':
+            geometry = json.dumps(tool_json["geometry"])
+            geometry_hash = sha256(geometry.encode()).hexdigest()
+            print_str += f'matching by Geometry Hash: {geometry_hash}'
+            library_tool = library_tool_geometry_hash.get(geometry_hash)
+        if library_tool:
+            print_str += f'\t Found Match'
+            operation.tool = library_tool
+        else:
+            print_str += f'\t No Match Found'
+        futil.log(print_str)
+    
 
 def command_preselect(args: adsk.core.SelectionEventArgs):
-    # if the user is selecting the end face then we need to check to see if the axis is valid
+    # APINOTDUMB: This runs when you open a command and so it acts like a selection filter
     inputs = args.activeInput.parentCommand.commandInputs
-
-
-# This function will be called when the user changes anything in the command dialog
-def command_input_changed(args: adsk.core.InputChangedEventArgs):
-    changed_input = args.input
-    inputs = args.inputs
-    axis_input: adsk.core.SelectionCommandInput = inputs.itemById('axis')
-    end_face_input: adsk.core.SelectionCommandInput = inputs.itemById('end_face')
-    # only make the axis and end face inputs visible if the body input has been set
-    if changed_input.id == 'body' and changed_input.selectionCount > 0:
-        axis_input.isVisible = True
-        axis_input.isEnabled = True
-    elif changed_input.id == 'body':
-        axis_input.isVisible = False
-        end_face_input.isVisible = False
-        axis_input.clearSelection()
-        end_face_input.clearSelection() 
-
-    if changed_input.id == 'axis' and changed_input.selectionCount > 0:
-        if end_face_input.selectionCount > 0:
-            end_face_input.clearSelection() 
-        end_face_input.isVisible = True
-        end_face_input.isEnabled = True
-    elif changed_input.id == 'axis':
-        end_face_input.isVisible = False
-        end_face_input.clearSelection()
+    # make sure that anything selected is a setup
+    if args.selection.entity is not None and args.selection.entity.classType() != 'adsk::cam::Setup':
+        args.isSelectable = False
 
 # This event handler is called when the command terminates.
 def command_destroy(args: adsk.core.CommandEventArgs):
     global local_handlers
     local_handlers = []
     futil.log(f'{CMD_NAME} Command Destroy Event')
-
 
 def get_tooling_libraries() -> List:
     # Get the list of tooling libraries
