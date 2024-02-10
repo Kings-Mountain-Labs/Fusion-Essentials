@@ -6,8 +6,8 @@ from ... import shared_state
 from ...timer import Timer, format_timer
 from typing import List, Dict
 import math
-from adsk.core import ValueInput, Vector3D, Point3D, Matrix3D, Line3D, DistanceValueCommandInput, AngleValueCommandInput, InputChangedEventArgs
-from adsk.fusion import BRepBody, BRepFace, TemporaryBRepManager
+from adsk.core import ValueInput, Vector3D, Point3D, Matrix3D, Line3D, DistanceValueCommandInput, AngleValueCommandInput, InputChangedEventArgs, SurfaceTypes
+from adsk.fusion import BRepBody, BRepFace, TemporaryBRepManager, Features
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -87,7 +87,7 @@ class PartDatum:
         self.theta = theta
         self.get_bottom_center_with_transformation()
 
-    def get_bottom_center_with_transformation(self) -> (Point3D, Matrix3D):
+    def get_bottom_center_with_transformation(self):
         # this function will return the bottom center point of the part datum with the transformation applied
         # get the center of the bottom face
         self.bottom_center = self.flb_point.copy()
@@ -102,7 +102,7 @@ class PartDatum:
         self.rotation_matrix = Matrix3D.create()
         self.rotation_matrix.setToRotation(self.top_vector.angleTo(Vector3D.create(0, 0, 1)), self.top_vector.crossProduct(Vector3D.create(0, 0, 1)), self.bottom_center)
         
-    def get_angular_x_y(self) -> (Vector3D, Vector3D):
+    def get_angular_x_y(self) -> tuple[Vector3D, Vector3D]:
         # rotate the x (right vector) of the bounding back by theta about the top vector
         x_vector = self.right_vector.copy()
         y_vector = self.right_vector.copy()
@@ -192,7 +192,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     # get the bounding box
     bounding_box = generate_bounding_box_with_face(parts, face, jaw_theta)
     # show the bounding box
-    generate_soft_jaws(args, parts, face, jaw_theta, bounding_box)
+    generate_soft_jaws(args, parts, face, bounding_box)
 
 # This function will be called when the command needs to compute a new preview in the graphics window
 def command_preview(args: adsk.core.CommandEventArgs):
@@ -210,7 +210,7 @@ def command_preview(args: adsk.core.CommandEventArgs):
     bounding_box = generate_bounding_box_with_face(parts, face, jaw_theta)
     # show the bounding box
     show_bounding_box(bounding_box)
-    generate_soft_jaws(args, parts, face, jaw_theta, bounding_box)
+    generate_soft_jaws(args, parts, face, bounding_box)
 
 
 # This function will be called when the user changes anything in the command dialog
@@ -315,7 +315,7 @@ def command_input_changed(args: InputChangedEventArgs):
 
         pass
 
-def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody], face: BRepFace, theta: float, part_datum: PartDatum):
+def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody], face: BRepFace, part_datum: PartDatum):
     # first things first, lets create a new component to house the jaws, within the active component
     jaw_offset_expression = args.command.commandInputs.itemById('jaw_offset').expression
     jaw_end_offset_expression = args.command.commandInputs.itemById('jaw_end_offset').expression
@@ -337,6 +337,7 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     # APIDUMB: Why is there no point primitive that that isn't part of a sketch?
     sketches = new_component.sketches
     sketch = sketches.add(plane)
+    sketch.isVisible = False
     sketch_points = sketch.sketchPoints
     our_origin = sketch_points.add(sketch.modelToSketchSpace(part_datum.bottom_center.copy())) # we have to transform it by the sketch origin
     our_origin.isFixed = True
@@ -367,6 +368,7 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     planeInput.setByThreePoints(our_origin, plane_point, tertiary_pt)
     plane3 = constructionPlanes.add(planeInput)
     plane3.name = "CenterPlane"
+    # plane3.isVisible = False # APIDUMB: This has no setter
 
     # now we create a sketch on the plane, and draw the cross section of the jaw
     sketch2 = sketches.add(plane2) # APIDUMB: I really want to be able to give it a orientation like NX so that using Horizontal and Vertical constraints are useful (if i cant they I have to consider them non-deterministic)
@@ -398,6 +400,8 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
 
         mid_spacing = dimensions.addDistanceDimension(plane_point_projection, our_tir_point, adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, Point3D.create())
         mid_spacing.parameter.expression = f"({jaw_middle_spacing_expression})/2" # this is such a ass interface, the way the object model handles Parameters vs expressions is strange
+        
+        constraints2.addCoincidentToSurface(our_tir_point, plane)
 
         # get the vector from the projected origin to the first point to second point and make the second point to that extent beyond the first, so that it ends up on the right side
         offset_vector = plane_point_projection.geometry.vectorTo(our_tir_point.geometry)
@@ -427,7 +431,7 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
         constraints2.addPerpendicular(side_line.item(1), side_line.item(2))
         constraints2.addPerpendicular(side_line.item(2), side_line.item(3))
         height = dimensions.addDistanceDimension(side_line.item(1).startSketchPoint, side_line.item(1).endSketchPoint, adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, Point3D.create())
-        height.parameter.expression = f"{jaw_height_expression}"
+        height.parameter.expression = f"-{jaw_height_expression}"
         # now we must constrain all the points to the plane
         constraints2.addCoincident(plane_point_projection, side_line.item(0))
         constraints2.addCoincidentToSurface(side_line.item(1).startSketchPoint, plane2)
@@ -435,7 +439,6 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
         constraints2.addCoincidentToSurface(side_line.item(3).startSketchPoint, plane2)
         constraints2.addCoincidentToSurface(side_line.item(3).endSketchPoint, plane2)
 
-        constraints2.addParallel(side_line.item(1), center_line)
     # dont worry about this, I know what im doing
     create_jaw_half()
     create_jaw_half()
@@ -483,17 +486,38 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
         # Step 1
         boolean_input = booleans.createInput(jaw_body, bodies_oc)
         boolean_input.operation = adsk.fusion.FeatureOperations.CutFeatureOperation
+        boolean_input.isKeepToolBodies = True
         combi_feature = booleans.add(boolean_input)
         # Step 2 - get the tokens for all the new faces of the jaw body
         new_jaw_faces = combi_feature.faces
         # Step 3 - remove or clearance shitty geometry
         faces_to_relieve: List[BRepFace] = []
+        delete_face_features = new_component.features.deleteFaceFeatures
+        faces_to_delete: List[BRepFace] = []
         for face in new_jaw_faces:
-            if face.objectType == adsk.fusion.BRepCylinder.classType():
-                pass
-
-
-    
+            if face.geometry.surfaceType == SurfaceTypes.CylinderSurfaceType:
+                # if the cylinder is axial and facing inwards then we won't add it to the list
+                cylinder_axis = adsk.core.Cylinder.cast(face.geometry).axis
+                futil.log(f"axis: {cylinder_axis.asArray()}\t{part_datum.top_vector.asArray()}\naxis parallel {cylinder_axis.isParallelTo(part_datum.top_vector)}\tface param reversed {face.isParamReversed}")
+                if cylinder_axis.isParallelTo(part_datum.top_vector) and face.isParamReversed:
+                    pass
+                elif cylinder_axis.isParallelTo(part_datum.top_vector) and not face.isParamReversed:
+                    pass
+                elif not cylinder_axis.isParallelTo(part_datum.right_vector) and face.isParamReversed:
+                    faces_to_delete.append(face)
+                else:
+                    faces_to_delete.append(face)
+            elif face.geometry.surfaceType == SurfaceTypes.ConeSurfaceType or face.geometry.surfaceType == SurfaceTypes.TorusSurfaceType or face.geometry.surfaceType == SurfaceTypes.SphereSurfaceType:
+                # We will clearance all cones, toroids, and spheres
+                if face.isParamReversed:
+                    pass
+                else:
+                    faces_to_delete.append(face)
+        
+        delete_faces_oc = adsk.core.ObjectCollection.create()
+        for face in faces_to_delete:
+            delete_faces_oc.add(face)
+        delete_face_input = delete_face_features.add(delete_faces_oc)
 
 def generate_bounding_box_with_face(bodies: List[BRepBody], face: BRepFace, theta: float) -> PartDatum:
     # This function will make a temporary duplicate of the bodies and align the face to the xy plane and rotate them by the theta
