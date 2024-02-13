@@ -66,7 +66,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # Option to select the central axis
     axis_input = inputs.addSelectionInput('axis', 'Axis', 'Select the axis to be used as the axis of rotation.')
-    axis_input.selectionFilters = ['ToroidalFaces', 'CylindricalFaces', 'ConicalFaces']
+    axis_input.selectionFilters = ['ToroidalFaces', 'CylindricalFaces', 'ConicalFaces', 'LinearEdges', 'ConstructionLines']
     axis_input.setSelectionLimits(1, 1)
     axis_input.isVisible = False
 
@@ -216,6 +216,8 @@ def get_axis(axis_base: adsk.core.Base) -> adsk.core.InfiniteLine3D:
         if edge_type == adsk.core.Curve3DTypes.Line3DCurveType:
             line = adsk.core.Line3D.cast(axis_base.geometry)
             return line.asInfiniteLine()
+    elif isinstance(axis_base, adsk.fusion.ConstructionAxis):
+        return axis_base.geometry
     return None
         
 def is_valid_axial_datum(surface: adsk.core.Base, axis: adsk.core.InfiniteLine3D) -> adsk.core.Point3D:
@@ -394,6 +396,8 @@ def filter_points(points):
 
 def get_cylindrical_coordinates_edge(edge: adsk.fusion.BRepEdge, axis: adsk.core.InfiniteLine3D, plane: adsk.core.Plane):
     # we only care if this edge is a arc or a circle
+    if edge.geometry is None: # APIDUMB: Why isn't a geometry object always returned? How can it not have a geometry?
+        return None
     edge_type = edge.geometry.curveType
     if edge_type != adsk.core.Curve3DTypes.Circle3DCurveType and edge_type != adsk.core.Curve3DTypes.Arc3DCurveType:
         return None
