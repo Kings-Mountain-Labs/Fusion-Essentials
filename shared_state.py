@@ -6,6 +6,7 @@ import adsk.core
 import os
 import platform
 from . import config
+from .lib import fusion360utils as futil
 
 def get_settings_directory():
     user_home = os.path.expanduser("~")
@@ -29,31 +30,50 @@ if not os.path.exists(settings_dir):
 
 SETTINGS_FILE = os.path.join(settings_dir, 'FusionEssentialsSettings.json')
 
+DEFAULT_ICON = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'commands', 'resources', 'default', '')
+
 def load_settings(module_name):
     all_settings = {}
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, 'r') as file:
             all_settings = json.load(file)
-    return all_settings.get(module_name, {})
+    return all_settings.get(module_name, {})["settings"]
 
-def load_settings_init(module_name, default_settings):
+def load_settings_init(module_id, module_name, default_settings, img_path):
     all_settings = {}
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, 'r') as file:
             all_settings = json.load(file)
-    if module_name not in all_settings.keys():
-        all_settings[module_name] = default_settings
+    if module_id not in all_settings.keys():
+        all_settings[module_id] = {}
+        all_settings[module_id]["name"] = module_name
+        all_settings[module_id]["settings"] = default_settings
+        if img_path:
+            all_settings[module_id]["img_path"] = img_path
+        else:
+            all_settings[module_id]["img_path"] = DEFAULT_ICON
     else:
-        merge_settings(default_settings, all_settings[module_name])
-    save_settings(module_name, all_settings[module_name])
+        if "settings" not in all_settings[module_id]: # for migration to the new format
+            tmp = all_settings[module_id]
+            all_settings[module_id] = {}
+            all_settings[module_id]["name"] = module_name
+            all_settings[module_id]["settings"] = tmp
+            if img_path:
+                all_settings[module_id]["img_path"] = img_path
+            else:
+                all_settings[module_id]["img_path"] = DEFAULT_ICON
+        merge_settings(default_settings, all_settings[module_id]["settings"])
 
-def save_settings(module_name, settings):
+    with open(SETTINGS_FILE, 'w') as file:
+        json.dump(all_settings, file, indent=4)
+
+def save_settings(module_id, settings):
     all_settings = {}
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, 'r') as file:
             all_settings = json.load(file)
 
-    all_settings[module_name] = settings
+    all_settings[module_id]["settings"] = settings
 
     with open(SETTINGS_FILE, 'w') as file:
         json.dump(all_settings, file, indent=4)

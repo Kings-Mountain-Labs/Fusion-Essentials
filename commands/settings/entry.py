@@ -29,15 +29,36 @@ MODULE_PREFIX = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_'
 # they are not released and garbage collected.
 local_handlers = []
 
-def start():
+running_commands = []
+current_commands = []
+
+def start(commands: List):
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
     futil.add_handler(cmd_def.commandCreated, command_created)
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
     control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
     control.isPromoted = IS_PROMOTED
+    feature_settings = shared_state.load_settings("FEATURE_ENABLEMENT")
+    for command in commands:
+        name = command.CMD_ID.replace(" ", "_")
+        if name in feature_settings:
+            if feature_settings[name]["default"]:
+                try:
+                    command.start()
+                    running_commands.append(command)
+                except:
+                    command.stop()
+
+    current_commands = commands
+    
 
 def stop():
+    for command in running_commands:
+        command.stop()
+
+    running_commands.clear()
+    current_commands.clear()
     # Get the various UI elements for this command
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
     panel = workspace.toolbarPanels.itemById(PANEL_ID)
@@ -50,6 +71,11 @@ def stop():
     if command_definition:
         command_definition.deleteMe()
 
+def correct_path_relative(path: str) -> str:
+    # we know that the last occurrence of the word commands is where we want to split, and replace everything before it with our current path
+    joined_first = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(joined_first.split("commands")[0], "commands", path.split("commands\\")[-1])
+
 def command_created(args):
     try:
         event_args = adsk.core.CommandCreatedEventArgs.cast(args)
@@ -59,11 +85,15 @@ def command_created(args):
         # Load all module settings
         all_module_settings = shared_state.get_all_module_settings()
 
-        # Create a tab for each module
-        for module_name, module_data in all_module_settings.items():
-            tabCmdInput = inputs.addTabCommandInput(module_name, module_name[len(MODULE_PREFIX):])
+        # make sure the "FEATURE_ENABLEMENT" settings are the first tab
+        feature_enablement = all_module_settings.pop("FEATURE_ENABLEMENT")
+        all_module_settings = {"FEATURE_ENABLEMENT": feature_enablement, **all_module_settings}
 
-            for setting_key, setting_metadata in module_data.items():
+        # Create a tab for each module
+        for module_id, module_data in all_module_settings.items():
+            tabCmdInput = inputs.addTabCommandInput(module_id, module_data["name"], correct_path_relative(module_data["img_path"]))
+
+            for setting_key, setting_metadata in module_data["settings"].items():
                 if setting_metadata["type"] == "button" or setting_metadata["type"] == "checkbox":
                     tabCmdInput.children.addBoolValueInput(setting_key, setting_metadata["label"], setting_metadata["type"] == "checkbox", "", setting_metadata["default"])
 
@@ -102,6 +132,19 @@ def input_changed_handler(args: adsk.core.InputChangedEventArgs):
 
         elif isinstance(changed_input, adsk.core.BoolValueCommandInput):
             module_settings[setting_key]["default"] = changed_input.value
+            # check if it was a feature enablement setting
+
+            # Realtime enable and disable doesn't work but this works fine for now
+            # if module_name == "FEATURE_ENABLEMENT":
+            #     # if it was, we need to start or stop the command based on the new value
+            #     for command in current_commands:
+            #         if command.CMD_ID.replace(" ", "_") == setting_key:
+            #             if changed_input.value:
+            #                 command.start()
+            #                 running_commands.append(command)
+            #             else:
+            #                 command.stop()
+            #                 running_commands.remove(command)
 
         # Save the modified settings back
         shared_state.save_settings(module_name, module_settings)

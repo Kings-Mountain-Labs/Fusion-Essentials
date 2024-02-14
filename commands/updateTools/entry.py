@@ -102,24 +102,36 @@ def command_execute(args: adsk.core.CommandEventArgs):
         replace_with_library_tool(setup, library, correlation_type)
         futil.log(f'Setup: {setup.name} {setup.classType()}')
 
+def remove_tip_keys(tool: dict) -> dict: # APIDUMB: For some reason when you get the tool back from a operation after the file has been closed and reopened all the tip values become zero
+    ''' Remove the tip keys from the tool dictionary '''
+    keys_to_remove = ['tip-angle', 'tip-diameter', 'tip-length', 'tip-offset', 'tip-radius', 'tip-type']
+    for key in keys_to_remove:
+        if key in tool.keys():
+            tool.pop(key)
+    return tool
+
 def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibrary, correlation_type: str):
     # Iterate through each operation in the setup and replace the tool with the library tool
     library_tool_description: Dict[str, adsk.cam.Tool] = {}
     library_tool_product_ids: Dict[str, adsk.cam.Tool] = {}
     library_tool_geometry_hash: Dict[str, adsk.cam.Tool] = {}
     bad_correlation = False
+    geom_debug = "Library tools: \n"
     for i in range(library.count):
         tool: adsk.cam.Tool = library.item(i)
-        tool_json = json.loads(tool.toJson())
+        tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: All the floats coming out of a newly opened file are .3f so we need to do this so the hash matches
         library_tool_description[tool_json["description"]] = tool
         library_tool_product_ids[tool_json["product-id"]] = tool
-        geometry = json.dumps(tool_json["geometry"])
-        geometry_hash = sha256(geometry.encode()).hexdigest()
-        library_tool_geometry_hash[geometry_hash] = tool
+        if "geometry" in tool_json.keys():
+            geometry = json.dumps(remove_tip_keys(tool_json["geometry"]))
+            geometry_hash = sha256(geometry.encode()).hexdigest()
+            geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
+            library_tool_geometry_hash[geometry_hash] = tool
+    geom_debug += "Setup tools: \n"
     for operation in setup.allOperations:
         operation: adsk.cam.Operation
         tool = operation.tool
-        tool_json = json.loads(tool.toJson()) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
+        tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
         preset_name: str
         if operation.toolPreset is None:
             preset_name = ''
@@ -138,8 +150,9 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
             print_str += f'matching by Product ID: {product_id}'
             library_tool = library_tool_product_ids.get(product_id)
         elif correlation_type == 'Geometry':
-            geometry = json.dumps(tool_json["geometry"])
+            geometry = json.dumps(remove_tip_keys(tool_json["geometry"]))
             geometry_hash = sha256(geometry.encode()).hexdigest()
+            geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
             print_str += f'matching by Geometry Hash: {geometry_hash}'
             library_tool = library_tool_geometry_hash.get(geometry_hash)
         if library_tool:
@@ -160,6 +173,15 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
             bad_correlation = True
         
         futil.log(print_str)
+
+    # save geom_debug to a file for debug
+    # fn = f'geom_debug_{time.strftime("%Y%m%d-%H%M%S")}.txt'
+    # with open(fn, 'w') as f:
+    #     f.write(geom_debug)
+    # log the file location
+    # futil.log(f'Geometry Debug: {fn}')
+    # futil.log(f"Directory: {os.getcwd()}")
+
     if bad_correlation:
         ui.messageBox(f'Some tools could not be correlated to the library.\nCheck the Text Command Panel for details.')
     

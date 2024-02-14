@@ -36,8 +36,7 @@ DEFAULT_SETTINGS = {
 }
 
 # Initialize the settings on first use
-if not shared_state.load_settings(CMD_ID):
-    shared_state.save_settings(CMD_ID, DEFAULT_SETTINGS)
+shared_state.load_settings_init(CMD_ID, CMD_NAME, DEFAULT_SETTINGS, ICON_FOLDER)
 
 timer = Timer()
 
