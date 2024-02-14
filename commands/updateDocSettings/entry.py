@@ -6,6 +6,8 @@ from ... import shared_state
 app = adsk.core.Application.get()
 
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_updateDocSettings'
+CMD_NAME = 'Automatic Import Settings'
+
 
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
@@ -26,8 +28,7 @@ DEFAULT_SETTINGS = {
 }
 
 # Initialize the settings on first use
-if not shared_state.load_settings(CMD_ID):
-    shared_state.save_settings(CMD_ID, DEFAULT_SETTINGS)
+shared_state.load_settings_init(CMD_ID, CMD_NAME, DEFAULT_SETTINGS, None)
 
 # Executed when add-in is run.
 def start():
