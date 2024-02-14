@@ -322,8 +322,8 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     jaw_middle_spacing_expression = args.command.commandInputs.itemById('jaw_middle_spacing').expression
     jaw_thickness_expression = args.command.commandInputs.itemById('jaw_thickness').expression
     jaw_height_expression = args.command.commandInputs.itemById('jaw_height').expression
-    des = adsk.fusion.Design.cast(app.activeProduct)
-    root = des.rootComponent
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    root = design.rootComponent
     new_component = root.occurrences.addNewComponent(Matrix3D.create()).component
     new_component.name = 'Softest Jaws'
     # Create a offset plane from the face by the jaw offset
@@ -480,6 +480,7 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
     for body in bodies:
         bodies_oc.add(body)
     for jaw_body in jaw_bodies.bodies:
+        jaw_body.name = "Soft Jaw"
         # Step 0 - get the tokens for all the original faces of the jaw body
         jaw_faces = jaw_body.faces
         jaw_face_tokens = [jaw_face.entityToken for jaw_face in jaw_faces]
@@ -488,6 +489,10 @@ def generate_soft_jaws(args: adsk.core.CommandEventArgs, bodies: List[BRepBody],
         boolean_input.operation = adsk.fusion.FeatureOperations.CutFeatureOperation
         boolean_input.isKeepToolBodies = True
         combi_feature = booleans.add(boolean_input)
+        # remove all the bodies that arent the jaw body
+        for body in combi_feature.bodies:
+            if design.findEntityByToken(body.entityToken) != design.findEntityByToken(jaw_body.entityToken):
+                futil.log(f"Removing body {body.name}")
         # Step 2 - get the tokens for all the new faces of the jaw body
         new_jaw_faces = combi_feature.faces
         # Step 3 - remove or clearance shitty geometry
