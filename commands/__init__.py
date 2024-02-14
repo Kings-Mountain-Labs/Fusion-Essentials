@@ -11,16 +11,17 @@ commands = [
     cleanChamfer,
     addHolder,
     colorHoles,
-    updateTools,
-    settings
+    updateTools
 ]
 
 def start():
     genPanels.start() # we need to make the panels that we are going to use first
+    settings.start()
     for command in commands:
         command.start()
 
 def stop():
     for command in commands:
         command.stop()
+    settings.stop()
     genPanels.stop() # we need to delete the panels last
