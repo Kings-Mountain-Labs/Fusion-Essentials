@@ -6,6 +6,7 @@ import adsk.core
 import os
 import platform
 from . import config
+from .lib import fusion360utils as futil
 
 def get_settings_directory():
     user_home = os.path.expanduser("~")

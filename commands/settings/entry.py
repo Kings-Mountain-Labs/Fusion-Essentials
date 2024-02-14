@@ -73,8 +73,8 @@ def stop():
 
 def correct_path_relative(path: str) -> str:
     # we know that the last occurrence of the word commands is where we want to split, and replace everything before it with our current path
-    joined_first = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-    return os.path.join(joined_first, path.split("commands")[-1])
+    joined_first = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(joined_first.split("commands")[0], "commands", path.split("commands\\")[-1])
 
 def command_created(args):
     try:
@@ -91,7 +91,7 @@ def command_created(args):
 
         # Create a tab for each module
         for module_id, module_data in all_module_settings.items():
-            tabCmdInput = inputs.addTabCommandInput(module_data["name"], correct_path_relative(module_data["img_path"]))
+            tabCmdInput = inputs.addTabCommandInput(module_id, module_data["name"], correct_path_relative(module_data["img_path"]))
 
             for setting_key, setting_metadata in module_data["settings"].items():
                 if setting_metadata["type"] == "button" or setting_metadata["type"] == "checkbox":
@@ -133,16 +133,18 @@ def input_changed_handler(args: adsk.core.InputChangedEventArgs):
         elif isinstance(changed_input, adsk.core.BoolValueCommandInput):
             module_settings[setting_key]["default"] = changed_input.value
             # check if it was a feature enablement setting
-            if module_name == "FEATURE_ENABLEMENT":
-                # if it was, we need to start or stop the command based on the new value
-                for command in current_commands:
-                    if command.CMD_ID.replace(" ", "_") == setting_key:
-                        if changed_input.value:
-                            command.start()
-                            running_commands.append(command)
-                        else:
-                            command.stop()
-                            running_commands.remove(command)
+
+            # Realtime enable and disable doesn't work but this works fine for now
+            # if module_name == "FEATURE_ENABLEMENT":
+            #     # if it was, we need to start or stop the command based on the new value
+            #     for command in current_commands:
+            #         if command.CMD_ID.replace(" ", "_") == setting_key:
+            #             if changed_input.value:
+            #                 command.start()
+            #                 running_commands.append(command)
+            #             else:
+            #                 command.stop()
+            #                 running_commands.remove(command)
 
         # Save the modified settings back
         shared_state.save_settings(module_name, module_settings)
