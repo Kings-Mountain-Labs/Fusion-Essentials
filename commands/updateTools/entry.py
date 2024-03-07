@@ -113,6 +113,17 @@ def command_execute(args: adsk.core.CommandEventArgs):
         else:
             futil.log(f'Unknown entity type: {obj.classType()}')
         
+    # remove duplicates
+    # store a list of the unique operation ids
+    unique_ids = []
+    # store the unique operations
+    unique_operations = []
+    for operation in operations:
+        if operation.operationId not in unique_ids:
+            unique_ids.append(operation.operationId)
+            unique_operations.append(operation)
+    operations = unique_operations
+    
     replace_with_library_tool(operations, library, correlation_type)
 
 def remove_tip_keys(tool: dict) -> dict: # APIDUMB: For some reason when you get the tool back from a operation after the file has been closed and reopened all the tip values become zero
@@ -180,7 +191,7 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: ads
                 print_str += f'\t Preset: {preset_name} successfully set'
             else:
                 print_str += f'\t Preset: {preset_name} not found in library tool'
-                futil.log(f"{json.dumps(presets)}\n{preset_descriptions}")
+                # futil.log(f"{json.dumps(presets)}\n{preset_descriptions}")
                 bad_correlation = True
         else:
             print_str += f'\t No Match Found'
