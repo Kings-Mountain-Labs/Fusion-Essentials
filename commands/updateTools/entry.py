@@ -156,7 +156,8 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: ads
         if correlation_type == 'Description':
             description = tool_json["description"]
             print_str += f'matching by Description: {description}'
-            library_tool = library_tool_description.get(description)
+            if description != '': # dont match if the description is empty
+                library_tool = library_tool_description.get(description)
         elif correlation_type == 'Product ID':
             product_id = tool_json["product-id"]
             print_str += f'matching by Product ID: {product_id}'
