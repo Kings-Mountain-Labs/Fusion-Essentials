@@ -17,13 +17,13 @@ DEFAULT_SETTINGS = {
     "option_checkbox": {
         "type": "checkbox",
         "label": "Automatically change units",
-        "default": True
+        "default": False
     },
     "units": {
         "type": "dropdown",
         "label": "Units",
         "options": ["in", "mm", "ft", "m", "cm"],
-        "default": "in"
+        "default": "mm"
     }
 }
 
