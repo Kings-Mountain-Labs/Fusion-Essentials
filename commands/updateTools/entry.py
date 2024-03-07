@@ -59,7 +59,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     inputs = args.command.commandInputs
 
     # Select the setup/s to be relinked
-    setup_input = inputs.addSelectionInput('setups', 'Setup(s) to Update', 'Select the setups that you would like relinked.')
+    setup_input = inputs.addSelectionInput('setups', 'Operation(s) to Update', 'Select the setups, operations, or folders that you would like relinked.')
     setup_input.setSelectionLimits(1, 0)
 
     # Make a drop down for correlation type
@@ -96,21 +96,34 @@ def command_execute(args: adsk.core.CommandEventArgs):
     library_index = formatted_libraries.index(library_input.selectedItem.name)
     library_url = adsk.core.URL.create(libraries[library_index])
     library = toolLibraries.toolLibraryAtURL(library_url)
-
-    for setup_ind in range(setup_input.selectionCount):
-        setup: adsk.cam.Setup = setup_input.selection(setup_ind).entity
-        replace_with_library_tool(setup, library, correlation_type)
-        futil.log(f'Setup: {setup.name} {setup.classType()}')
+    operations: List[adsk.cam.Operation] = []
+    for obj_ind in range(setup_input.selectionCount):
+        obj = setup_input.selection(obj_ind).entity
+        if obj.classType() == 'adsk::cam::Setup':
+            setup: adsk.cam.Setup = obj
+            for operation in setup.allOperations:
+                operations.append(operation)
+        elif obj.classType() == 'adsk::cam::Operation':
+            operation: adsk.cam.Operation = obj
+            operations.append(operation)
+        elif obj.classType() == 'adsk::cam::CAMFolder':
+            folder: adsk.cam.CAMFolder = obj
+            for operation in folder.allOperations:
+                operations.append(operation)
+        else:
+            futil.log(f'Unknown entity type: {obj.classType()}')
+        
+    replace_with_library_tool(operations, library, correlation_type)
 
 def remove_tip_keys(tool: dict) -> dict: # APIDUMB: For some reason when you get the tool back from a operation after the file has been closed and reopened all the tip values become zero
-    ''' Remove the tip keys from the tool dictionary '''
+    # Remove the tip keys from the tool dictionary
     keys_to_remove = ['tip-angle', 'tip-diameter', 'tip-length', 'tip-offset', 'tip-radius', 'tip-type']
     for key in keys_to_remove:
         if key in tool.keys():
             tool.pop(key)
     return tool
 
-def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibrary, correlation_type: str):
+def replace_with_library_tool(operations: List[adsk.cam.Operation], library: adsk.cam.ToolLibrary, correlation_type: str):
     # Iterate through each operation in the setup and replace the tool with the library tool
     library_tool_description: Dict[str, adsk.cam.Tool] = {}
     library_tool_product_ids: Dict[str, adsk.cam.Tool] = {}
@@ -128,8 +141,7 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
             geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
             library_tool_geometry_hash[geometry_hash] = tool
     geom_debug += "Setup tools: \n"
-    for operation in setup.allOperations:
-        operation: adsk.cam.Operation
+    for operation in operations:
         tool = operation.tool
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
         preset_name: str
@@ -148,7 +160,8 @@ def replace_with_library_tool(setup: adsk.cam.Setup, library: adsk.cam.ToolLibra
         elif correlation_type == 'Product ID':
             product_id = tool_json["product-id"]
             print_str += f'matching by Product ID: {product_id}'
-            library_tool = library_tool_product_ids.get(product_id)
+            if product_id != '': # dont match if the product id is empty
+                library_tool = library_tool_product_ids.get(product_id)
         elif correlation_type == 'Geometry':
             geometry = json.dumps(remove_tip_keys(tool_json["geometry"]))
             geometry_hash = sha256(geometry.encode()).hexdigest()
@@ -190,7 +203,7 @@ def command_preselect(args: adsk.core.SelectionEventArgs):
     # APINOTDUMB: This runs when you open a command and so it acts like a selection filter
     inputs = args.activeInput.parentCommand.commandInputs
     # make sure that anything selected is a setup
-    if args.selection.entity is not None and args.selection.entity.classType() != 'adsk::cam::Setup':
+    if args.selection.entity is not None and not args.selection.entity.classType() in ['adsk::cam::Setup', 'adsk::cam::Operation', 'adsk::cam::CAMFolder']:
         args.isSelectable = False
 
 # This event handler is called when the command terminates.
