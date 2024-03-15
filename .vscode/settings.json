@@ -1,6 +1,6 @@
 {
-	"python.autoComplete.extraPaths":	["C:/Users/ian/AppData/Roaming/Autodesk/Autodesk Fusion 360/API/Python/defs"],
-	"python.analysis.extraPaths":	["C:/Users/ian/AppData/Roaming/Autodesk/Autodesk Fusion 360/API/Python/defs"],
-	"python.defaultInterpreterPath":	"C:/Users/ian/AppData/Local/Autodesk/webdeploy/production/9852aa66f5af6660db76d8087c75a7da16ce322c/Python/python.exe",
+	"python.autoComplete.extraPaths":	["C:/Users/ian/AppData/Roaming/Autodesk/Autodesk Fusion 360/API/Python/defs", "/Users/ianrist/Library/Application Support/Autodesk/Autodesk Fusion 360/API/Python/defs"],
+	"python.analysis.extraPaths":	["C:/Users/ian/AppData/Roaming/Autodesk/Autodesk Fusion 360/API/Python/defs", "/Users/ianrist/Library/Application Support/Autodesk/Autodesk Fusion 360/API/Python/defs"],
+	"python.defaultInterpreterPath":	"/Users/ianrist/Library/Application Support/Autodesk/webdeploy/production/66fca321b6498e6b4fc9adcaae26d2ac05947169/Autodesk Fusion 360.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python",
 	"cSpell.words":	["futil"]
 }

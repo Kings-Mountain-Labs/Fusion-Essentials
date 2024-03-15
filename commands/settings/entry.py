@@ -45,9 +45,11 @@ def start(commands: List):
         if name in feature_settings:
             if feature_settings[name]["default"]:
                 try:
+                    # futil.log(f'{command.CMD_NAME} Command Starting')
                     command.start()
                     running_commands.append(command)
                 except:
+                    # futil.log(f'{command.CMD_NAME} Command Failed to Start')
                     command.stop()
 
     current_commands = commands
