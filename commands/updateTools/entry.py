@@ -146,6 +146,7 @@ class LibraryTool:
         if self.document_index == -1:
             dtl.add(self.tool)
             self.document_index = dtl.count - 1
+        futil.log(f'Library Tool {self.tool.toJson()["description"]}: {self.tool.toJson()==dtl.item(self.document_index).toJson()}')
         return dtl.item(self.document_index)
 
 
@@ -164,7 +165,7 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: All the floats coming out of a newly opened file are .3f so we need to do this so the hash matches
         library_tool_used.append(LibraryTool(tool))
         lib_num = library_tool_used.__len__() - 1
-        futil.log(f'Library Tool: {tool.toJson()==library_tool_used[lib_num].tool.toJson()}')
+        
         library_tool_description[tool_json["description"]] = lib_num
         library_tool_product_ids[tool_json["product-id"]] = lib_num
         if "geometry" in tool_json.keys():
