@@ -146,7 +146,7 @@ class LibraryTool:
         if self.document_index == -1:
             dtl.add(self.tool)
             self.document_index = dtl.count - 1
-        futil.log(f'Library Tool {dict(self.tool.toJson())["description"]}: {self.tool.toJson()==dtl.item(self.document_index).toJson()}')
+        futil.log(f'Library Tool : {self.tool.toJson()==dtl.item(self.document_index).toJson()}')
         return dtl.item(self.document_index)
 
 
