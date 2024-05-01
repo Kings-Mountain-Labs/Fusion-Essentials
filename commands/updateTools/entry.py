@@ -7,7 +7,7 @@ import time
 import random
 from typing import List, Dict
 import math
-from adsk.cam import ToolLibrary, Tool
+from adsk.cam import ToolLibrary, Tool, DocumentToolLibrary
 from hashlib import sha256
 
 app = adsk.core.Application.get()
@@ -134,23 +134,42 @@ def remove_tip_keys(tool: dict) -> dict: # APIDUMB: For some reason when you get
             tool.pop(key)
     return tool
 
-def replace_with_library_tool(operations: List[adsk.cam.Operation], library: adsk.cam.ToolLibrary, correlation_type: str):
+class LibraryTool:
+    tool: Tool
+    used_already: bool
+    document_index: int
+    def __init__(self, tool: Tool):
+        self.tool = tool
+        self.document_index = -1
+
+    def get_tool(self, dtl: DocumentToolLibrary) -> Tool:
+        if self.document_index == -1:
+            dtl.add(self.tool)
+            self.document_index = dtl.count - 1
+        return dtl.item(self.document_index)
+
+
+def replace_with_library_tool(operations: List[adsk.cam.Operation], library: ToolLibrary, correlation_type: str):
     # Iterate through each operation in the setup and replace the tool with the library tool
-    library_tool_description: Dict[str, adsk.cam.Tool] = {}
-    library_tool_product_ids: Dict[str, adsk.cam.Tool] = {}
-    library_tool_geometry_hash: Dict[str, adsk.cam.Tool] = {}
+    library_tool_description: Dict[str, int] = {}
+    library_tool_product_ids: Dict[str, int] = {}
+    library_tool_geometry_hash: Dict[str, int] = {}
+    library_tool_used: List[LibraryTool] = []
     bad_correlation = False
+    cam = adsk.cam.CAM.cast(app.activeProduct)
+    dtl = cam.documentToolLibrary
     geom_debug = "Library tools: \n"
     for i in range(library.count):
-        tool: adsk.cam.Tool = library.item(i)
+        tool: Tool = library.item(i)
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: All the floats coming out of a newly opened file are .3f so we need to do this so the hash matches
-        library_tool_description[tool_json["description"]] = tool
-        library_tool_product_ids[tool_json["product-id"]] = tool
+        library_tool_used.append(LibraryTool(tool))
+        library_tool_description[tool_json["description"]] = library_tool_used.__len__() - 1
+        library_tool_product_ids[tool_json["product-id"]] = library_tool_used.__len__() - 1
         if "geometry" in tool_json.keys():
             geometry = json.dumps(remove_tip_keys(tool_json["geometry"]))
             geometry_hash = sha256(geometry.encode()).hexdigest()
             geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
-            library_tool_geometry_hash[geometry_hash] = tool
+            library_tool_geometry_hash[geometry_hash] = library_tool_used.__len__() - 1
     geom_debug += "Setup tools: \n"
     for operation in operations:
         tool = operation.tool
@@ -181,12 +200,13 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: ads
             print_str += f'matching by Geometry Hash: {geometry_hash}'
             library_tool = library_tool_geometry_hash.get(geometry_hash)
         if library_tool:
+            lib_tool = library_tool_used[library_tool]
             print_str += f'\t Found Match'
-            operation.tool = library_tool
-            presets = json.loads(library_tool.toJson())['start-values']['presets']
+            operation.tool = lib_tool.get_tool(dtl)
+            presets = json.loads(lib_tool.tool.toJson())['start-values']['presets']
             preset_descriptions = [preset['name'] for preset in presets]
             if preset_name in preset_descriptions:
-                items = library_tool.presets.itemsByName(preset_name)
+                items = lib_tool.tool.presets.itemsByName(preset_name)
                 operation.toolPreset = items[0]
                 print_str += f'\t Preset: {preset_name} successfully set'
             else:
