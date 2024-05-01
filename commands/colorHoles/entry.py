@@ -70,13 +70,6 @@ def start():
     control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
     control.isPromoted = IS_PROMOTED
     futil.add_handler(ui.activeSelectionChanged, active_selection_changed)
-    futil.add_handler(app.documentActivated, document_changed)
-    global _custom_graphics_group
-    design = adsk.fusion.Design.cast(app.activeProduct)
-    try:
-        _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
-    except:
-        futil.log("Could not create custom graphics group")
 
 def stop():
     # Get the various UI elements for this command
@@ -95,22 +88,14 @@ def stop():
     # Remove the event handlers
     futil.clear_handlers()
 
-def document_changed(args: adsk.core.DocumentEventArgs):
-    # General logging for debug.
-    futil.log(f'{CMD_NAME} Document Changed Event')
-    global _custom_graphics_group
-    _custom_graphics_group = None
-    design = adsk.fusion.Design.cast(app.activeProduct)
-    if design is not None:
-        _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
-    else:
-        futil.log("DC: Could not create custom graphics group")
 
 def try_create_custom_graphics_group():
     global _custom_graphics_group
-    _custom_graphics_group = None
     design = adsk.fusion.Design.cast(app.activeProduct)
     if design is not None:
+        # check to see if the current design entity token is the same as the one for the current design
+        if _custom_graphics_group.parent == design.rootComponent:
+            return
         _custom_graphics_group = design.rootComponent.customGraphicsGroups.add()
     else:
         futil.log("TCGG: Could not create custom graphics group")
@@ -137,6 +122,7 @@ def active_selection_changed(args: adsk.core.ActiveSelectionEventArgs):
             billboard = adsk.fusion.CustomGraphicsBillBoard.create(Point3D.create(0, 0, 0))
             clear_graphics()
             mat = best_display_point(ent, cylinder_face)
+            try_create_custom_graphics_group()
             if _custom_graphics_group is not None:
                 custom_text: adsk.fusion.CustomGraphicsText = _custom_graphics_group.addText(name, "Arial", 0.25, mat)
                 # APIDUMB: Why is the color of the text a CustomGraphicsColorEffect and not a Color?
