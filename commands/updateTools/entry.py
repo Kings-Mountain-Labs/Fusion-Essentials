@@ -163,13 +163,15 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
         tool: Tool = library.item(i)
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: All the floats coming out of a newly opened file are .3f so we need to do this so the hash matches
         library_tool_used.append(LibraryTool(tool))
-        library_tool_description[tool_json["description"]] = library_tool_used.__len__() - 1
-        library_tool_product_ids[tool_json["product-id"]] = library_tool_used.__len__() - 1
+        lib_num = library_tool_used.__len__() - 1
+        futil.log(f'Library Tool: {tool.toJson()==library_tool_used[lib_num].tool.toJson()}')
+        library_tool_description[tool_json["description"]] = lib_num
+        library_tool_product_ids[tool_json["product-id"]] = lib_num
         if "geometry" in tool_json.keys():
             geometry = json.dumps(remove_tip_keys(tool_json["geometry"]))
             geometry_hash = sha256(geometry.encode()).hexdigest()
             geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
-            library_tool_geometry_hash[geometry_hash] = library_tool_used.__len__() - 1
+            library_tool_geometry_hash[geometry_hash] = lib_num
     geom_debug += "Setup tools: \n"
     for operation in operations:
         tool = operation.tool
