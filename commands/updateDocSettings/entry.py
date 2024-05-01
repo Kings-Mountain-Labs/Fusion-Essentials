@@ -4,14 +4,10 @@ from ... import config
 from ... import shared_state
 
 app = adsk.core.Application.get()
+ui = app.userInterface
 
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_updateDocSettings'
 CMD_NAME = 'Automatic Import Settings'
-
-
-# Local list of event handlers used to maintain a reference so
-# they are not released and garbage collected.
-local_handlers = []
 
 DEFAULT_SETTINGS = {
     "option_checkbox": {
@@ -32,20 +28,21 @@ shared_state.load_settings_init(CMD_ID, CMD_NAME, DEFAULT_SETTINGS, None)
 
 # Executed when add-in is run.
 def start():
-    futil.add_handler(app.documentOpened, update_doc_settings, local_handlers=local_handlers)
+    futil.add_handler(app.documentOpened, update_doc_settings)
 
 def stop():
-    local_handlers = []
+    futil.clear_handlers()
 
 # Event handler for the documentOpening event.
-def update_doc_settings(args: adsk.core.DocumentEventArgs):
-    eventArgs = adsk.core.DocumentEventArgs.cast(args)
+def update_doc_settings(eventArgs: adsk.core.DocumentEventArgs):
     # Make sure that it is the first time opening the document and that it is a Fusion Design and not Eagle or something.
     # Creating a new document will not trigger this event, so it should only trigger with imported files.
-    if  eventArgs.document.dataFile.versions.count == 1 and eventArgs.document.objectType == "adsk::fusion::FusionDocument":
+    # futil.log(f"{eventArgs.document.isSaved} {eventArgs.document.isModified} {eventArgs.document.isActive}")
+    if eventArgs.document.dataFile.versions.count == 1 and eventArgs.document.objectType == "adsk::fusion::FusionDocument":
         design = adsk.fusion.FusionDocument.cast(eventArgs.document).design
         design.designType = adsk.fusion.DesignTypes.ParametricDesignType
         update_units, unit = get_settings()
+        futil.log(f"Update units: {update_units}, unit: {unit}")
         if update_units:
             design.fusionUnitsManager.distanceDisplayUnits = unit
 
