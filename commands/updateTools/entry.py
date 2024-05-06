@@ -136,20 +136,18 @@ def remove_tip_keys(tool: dict) -> dict: # APIDUMB: For some reason when you get
 
 class LibraryTool:
     tool: Tool
-    used_already: bool
-    document_index: int
+    document_tool: Tool = None
     def __init__(self, tool: Tool):
         self.tool = tool
-        self.document_index = -1
 
     def get_tool(self, dtl: DocumentToolLibrary) -> Tool:
-        if self.document_index == -1:
+        if self.document_tool is None:
             dtl.add(self.tool)
-            self.document_index = dtl.count - 1
-        doc = json.loads(dtl.item(self.document_index).toJson(), parse_float=lambda x: round(float(x), 3))
+            self.document_tool = dtl.item(dtl.count - 1)
+        doc = json.loads(self.document_tool.toJson(), parse_float=lambda x: round(float(x), 3))
         local = json.loads(self.tool.toJson(), parse_float=lambda x: round(float(x), 3))
-        futil.log(f'Library Tool {local["description"]} - {doc["description"]}: {self.tool.toJson()==dtl.item(self.document_index).toJson()}')
-        return dtl.item(self.document_index)
+        futil.log(f'Library Tool {local["description"]} - {doc["description"]}: {self.tool.toJson()==self.document_tool.toJson()}')
+        return self.document_tool
 
 
 def replace_with_library_tool(operations: List[adsk.cam.Operation], library: ToolLibrary, correlation_type: str):
