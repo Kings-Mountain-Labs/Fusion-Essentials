@@ -6,6 +6,7 @@ from ... import config
 import time
 import random
 from typing import List, Dict
+from ...timer import Timer, format_timer
 import math
 from adsk.cam import ToolLibrary, Tool, DocumentToolLibrary
 from hashlib import sha256
@@ -27,6 +28,8 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
 local_handlers = []
+
+timer = Timer()
 
 def start():
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
@@ -95,7 +98,11 @@ def command_execute(args: adsk.core.CommandEventArgs):
     formatted_libraries = format_library_names(libraries)
     library_index = formatted_libraries.index(library_input.selectedItem.name)
     library_url = adsk.core.URL.create(libraries[library_index])
+    timer.mark('get_library')
+    if config.TIMING:
+        futil.log(f'Library URL: {library_url.toString()}')
     library = toolLibraries.toolLibraryAtURL(library_url)
+    timer.mark('get_operations')
     operations: List[adsk.cam.Operation] = []
     for obj_ind in range(setup_input.selectionCount):
         obj = setup_input.selection(obj_ind).entity
@@ -113,6 +120,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
         else:
             futil.log(f'Unknown entity type: {obj.classType()}')
         
+    timer.mark('remove_duplicates')
     # remove duplicates
     # store a list of the unique operation ids
     unique_ids = []
@@ -125,6 +133,9 @@ def command_execute(args: adsk.core.CommandEventArgs):
     operations = unique_operations
     
     replace_with_library_tool(operations, library, correlation_type)
+    timing = timer.finish()
+    if config.TIMING:
+        futil.log(format_timer(timing))
 
 def remove_tip_keys(tool: dict) -> dict: # APIDUMB: For some reason when you get the tool back from a operation after the file has been closed and reopened all the tip values become zero
     # Remove the tip keys from the tool dictionary
@@ -149,8 +160,8 @@ class LibraryTool:
         futil.log(f'Library Tool {local["description"]} - {doc["description"]}: {self.tool.toJson()==self.document_tool.toJson()}')
         return self.document_tool
 
-
 def replace_with_library_tool(operations: List[adsk.cam.Operation], library: ToolLibrary, correlation_type: str):
+    timer.mark('replace_tool')
     # Iterate through each operation in the setup and replace the tool with the library tool
     library_tool_description: Dict[str, int] = {}
     library_tool_product_ids: Dict[str, int] = {}
@@ -160,7 +171,9 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
     cam = adsk.cam.CAM.cast(app.activeProduct)
     dtl = cam.documentToolLibrary
     geom_debug = "Library tools: \n"
+    timer.mark('replace_tool:get_tools_info')
     for i in range(library.count):
+        timer.mark(f'replace_tool:get_tools_info:next_tool')
         tool: Tool = library.item(i)
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: All the floats coming out of a newly opened file are .3f so we need to do this so the hash matches
         library_tool_used.append(LibraryTool(tool))
@@ -174,7 +187,9 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
             geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
             library_tool_geometry_hash[geometry_hash] = lib_num
     geom_debug += "Setup tools: \n"
+    timer.mark('replace_tool:iterate_operations')
     for operation in operations:
+        timer.mark(f'replace_tool:get_tool')
         tool = operation.tool
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
         preset_name: str
@@ -184,6 +199,7 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
             preset_name = operation.toolPreset.name
         # futil.log(f'Tool: {json.dumps(tool_json)}')
         print_str = f'Operation: {operation.name}'
+        timer.mark(f'replace_tool:correlate_operation')
         # pad the string to 32 characters
         print_str += ' ' * (32 - len(operation.name))
         if correlation_type == 'Description':
@@ -202,6 +218,7 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
             geom_debug += f'{geometry_hash}: \"{geometry}\"\n'
             print_str += f'matching by Geometry Hash: {geometry_hash}'
             library_tool = library_tool_geometry_hash.get(geometry_hash)
+        timer.mark(f'replace_tool:set_tool')
         if library_tool:
             lib_tool = library_tool_used[library_tool]
             print_str += f'\t Found Match'
@@ -219,8 +236,9 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
         else:
             print_str += f'\t No Match Found'
             bad_correlation = True
-        
+        timer.mark(f'replace_tool:done')
         futil.log(print_str)
+    timer.mark('donedone')
 
     # save geom_debug to a file for debug
     # fn = f'geom_debug_{time.strftime("%Y%m%d-%H%M%S")}.txt'
@@ -249,14 +267,24 @@ def command_destroy(args: adsk.core.CommandEventArgs):
 
 def get_tooling_libraries() -> List:
     # Get the list of tooling libraries
+    timer.mark('get_tooling_libraries')
+    timer.mark('get_tooling_libraries:get_cam_manager')
     camManager = adsk.cam.CAMManager.get()
+    timer.mark('get_tooling_libraries:get_library_manager')
     libraryManager = camManager.libraryManager
+    timer.mark('get_tooling_libraries:get_tool_libraries')
     toolLibraries = libraryManager.toolLibraries
+    timer.mark('get_tooling_libraries:get_cloud_library')
     fusion360Folder = toolLibraries.urlByLocation(adsk.cam.LibraryLocations.CloudLibraryLocation)
+    timer.mark('get_tooling_libraries:get_cloud_library_urls')
     libraries = getLibrariesURLs(toolLibraries, fusion360Folder)
+    timer.mark('get_tooling_libraries:get_local_library')
     fusion360Folder = toolLibraries.urlByLocation(adsk.cam.LibraryLocations.LocalLibraryLocation)
+    timer.mark('get_tooling_libraries:get_local_library_urls')
     libraries = libraries + getLibrariesURLs(toolLibraries, fusion360Folder)
+    timer.mark('get_tooling_libraries:get_external_library')
     fusion360Folder = toolLibraries.urlByLocation(adsk.cam.LibraryLocations.ExternalLibraryLocation)
+    timer.mark('get_tooling_libraries:get_external_library_urls')
     libraries = libraries + getLibrariesURLs(toolLibraries, fusion360Folder)
     return libraries
 

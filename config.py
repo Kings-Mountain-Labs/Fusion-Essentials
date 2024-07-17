@@ -9,6 +9,10 @@ import os
 # to set this to True while developing an add-in and set it to False when you
 # are ready to distribute it.
 DEBUG = True
+TIMING = False
+if os.path.exists('.env'):
+    TIMING = True
+
 
 # Gets the name of the add-in from the name of the folder the py file is in.
 # This is used when defining unique internal names for various UI elements 

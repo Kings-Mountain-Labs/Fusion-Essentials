@@ -217,7 +217,7 @@ def patch_faces(selections: adsk.core.SelectionCommandInput, sew: bool):
         tg = tgs.add(firstTLN.index, secondTLN.index)
 
     timing = timer.finish()
-    if config.DEBUG:
+    if config.TIMING:
         futil.log(format_timer(timing))
 
 def are_vectors_parallel(vector1: adsk.core.Vector3D, vector2: adsk.core.Vector3D, tol: float = 1e-6) -> bool:
