@@ -299,8 +299,11 @@ def mk_color(rgb: rgbCl):
     if myColor:
         return myColor
     else:
-        # Get the existing Yellow appearance.            
-        fusionMaterials = app.materialLibraries.itemByName('Fusion 360 Appearance Library')
+        # Get the existing Yellow appearance.
+        if config.DEBUG:
+            for i in range(app.materialLibraries.count):
+                futil.log(f"{app.materialLibraries.item(i).name} {app.materialLibraries.item(i).id}")    
+        fusionMaterials = app.materialLibraries.itemByName('Fusion Appearance Library')
         yellowColor = fusionMaterials.appearances.itemByName('Paint - Enamel Glossy (Yellow)')
         
         # Copy it to the design, giving it a new name.
