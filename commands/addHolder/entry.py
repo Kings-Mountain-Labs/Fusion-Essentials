@@ -87,6 +87,9 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     prodlink_input = inputs.addStringValueInput('prodlink', 'Product Link', 'Enter the link to the product page.')
     prodlink_input.value = ""
 
+    prodvendor_input = inputs.addStringValueInput('prodvendor', 'Vendor', 'Enter the Vendor Details.')
+    prodvendor_input.value = ""
+
     # Option to select which tooling library to use
     library_input = inputs.addDropDownCommandInput('library', 'Library', adsk.core.DropDownStyles.TextListDropDownStyle)
     # Get the list of tooling libraries
@@ -123,8 +126,11 @@ def command_execute(args: adsk.core.CommandEventArgs):
     # Get the product link
     prodlink_input = inputs.itemById('prodlink')
     prodlink = prodlink_input.value
+    # Get the Vendor details
+    prodvendor_input = inputs.itemById('prodvendor')
+    prodvendor = prodvendor_input.value
 
-    tool = generate_tool(tool_profile, name, prodid, prodlink)
+    tool = generate_tool(tool_profile, name, prodid, prodlink, prodvendor)
 
     futil.log(f'Tool:\n{tool.toJson()}')
 
@@ -453,7 +459,7 @@ def format_library_names(libraries: List) -> List:
         formatted_libraries.append(library.split('/')[-1])
     return formatted_libraries
 
-def generate_tool(profile, desc, prodid, prodlink) -> Tool:
+def generate_tool(profile, desc, prodid, prodlink, prodvendor) -> Tool:
     guid = "00000000-0000-0000-0000-" + str(random.randint(100000000000,999999999999))
     data = {
         "description": desc,
@@ -465,7 +471,7 @@ def generate_tool(profile, desc, prodid, prodlink) -> Tool:
         "segments": [],
         "type": "holder",
         "unit": "millimeters",
-        "vendor": ""
+        "vendor": prodvendor,
     }
     
     for segment in profile:
