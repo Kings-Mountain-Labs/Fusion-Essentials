@@ -1,0 +1,53 @@
+{
+  "//": [
+    "Fusion-Essentials team permission defaults.",
+    "",
+    "DEFAULT POSTURE: the read-only tools below are auto-approved (they change nothing, so they are",
+    "safe to call without a prompt - this is the honesty contract's read/write split driving the",
+    "permission posture directly). Every WRITE and DESTRUCTIVE tool is omitted, so it still prompts.",
+    "",
+    "The list is exactly the tools whose readOnlyHint is true; update it when you add a read tool.",
+    "Claude Code settings are STRICT JSON (no inline comments), so change the posture by EDITING the",
+    "allow list, not by uncommenting:",
+    "  - Auto-approve EVERY Fusion-Essentials tool (writes included): replace the whole list with the",
+    "    single entry \"mcp__fusion-essentials\".",
+    "  - Also auto-approve the arbitrary-script tool (sys_execute_script runs Fusion API Python - high",
+    "    risk): add \"mcp__fusion-essentials__sys_execute_script\".",
+    "  - Tighten further: remove any tool from the list to make it prompt again."
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__fusion-essentials__assembly_get",
+      "mcp__fusion-essentials__assembly_inspect_interference",
+      "mcp__fusion-essentials__cam_compare_operations",
+      "mcp__fusion-essentials__cam_get",
+      "mcp__fusion-essentials__cam_get_status",
+      "mcp__fusion-essentials__cam_inspect_toolpaths",
+      "mcp__fusion-essentials__data_get",
+      "mcp__fusion-essentials__data_get_upload_status",
+      "mcp__fusion-essentials__design_get",
+      "mcp__fusion-essentials__doc_get",
+      "mcp__fusion-essentials__drawing_get",
+      "mcp__fusion-essentials__drawing_get_status",
+      "mcp__fusion-essentials__find_geometry",
+      "mcp__fusion-essentials__mesh_get",
+      "mcp__fusion-essentials__model_compute_holder",
+      "mcp__fusion-essentials__model_inspect",
+      "mcp__fusion-essentials__model_measure_between",
+      "mcp__fusion-essentials__model_measure_relation",
+      "mcp__fusion-essentials__param_get",
+      "mcp__fusion-essentials__pmi_get",
+      "mcp__fusion-essentials__sketch_get",
+      "mcp__fusion-essentials__sys_capability_map",
+      "mcp__fusion-essentials__sys_find_tool",
+      "mcp__fusion-essentials__sys_get_api_doc",
+      "mcp__fusion-essentials__sys_get_guidance",
+      "mcp__fusion-essentials__sys_get_preferences",
+      "mcp__fusion-essentials__sys_get_selection",
+      "mcp__fusion-essentials__view_list_workspaces",
+      "mcp__fusion-essentials__view_screenshot",
+      "mcp__fusion-essentials__view_screenshot_multi",
+      "mcp__fusion-essentials__workspace_orient"
+    ]
+  }
+}

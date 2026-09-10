@@ -191,6 +191,10 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
     for operation in operations:
         timer.mark(f'replace_tool:get_tool')
         tool = operation.tool
+        if tool is None:
+            futil.log(f'Operation: {operation.name}\tSkipped: no tool assigned; choose an operation with a tool.')
+            bad_correlation = True
+            continue
         tool_json = json.loads(tool.toJson(), parse_float=lambda x: round(float(x), 3)) # APIDUMB: WHAT IF I DONT WANT TO USE JSON??? WHAT ABOUT JUST ACCESSING THE PROPERTIES DIRECTLY???
         preset_name: str
         if operation.toolPreset is None:
@@ -202,6 +206,7 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
         timer.mark(f'replace_tool:correlate_operation')
         # pad the string to 32 characters
         print_str += ' ' * (32 - len(operation.name))
+        library_tool = None
         if correlation_type == 'Description':
             description = tool_json["description"]
             print_str += f'matching by Description: {description}'
@@ -219,7 +224,7 @@ def replace_with_library_tool(operations: List[adsk.cam.Operation], library: Too
             print_str += f'matching by Geometry Hash: {geometry_hash}'
             library_tool = library_tool_geometry_hash.get(geometry_hash)
         timer.mark(f'replace_tool:set_tool')
-        if library_tool:
+        if library_tool is not None:
             lib_tool = library_tool_used[library_tool]
             print_str += f'\t Found Match'
             operation.tool = lib_tool.get_tool(dtl)

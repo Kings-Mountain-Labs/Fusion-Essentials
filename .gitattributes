@@ -1,2 +1,4 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Auto detect text files; normalize to LF in the repo AND on checkout (every OS).
+# eol=lf (not just text=auto) is what stops the "LF will be replaced by CRLF" churn on Windows
+# so external contributors get consistent line endings regardless of platform/core.autocrlf.
+* text=auto eol=lf

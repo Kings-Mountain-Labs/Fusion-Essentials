@@ -1,0 +1,563 @@
+# Fusion-Essentials local Codex MCP permissions.
+# Every registered tool is explicit. Cloud file/folder deletion and arbitrary
+# Fusion API scripting require approval; all other typed tools are pre-approved.
+project_doc_fallback_filenames = ["CLAUDE.md"]
+
+[mcp_servers.fusion-essentials]
+url = "http://127.0.0.1:27182/mcp"
+enabled = true
+required = false
+# Safe fallback for a newly added tool that is not yet listed below.
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.fusion-essentials.tools.appearance_set]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_capture_position]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_constrain]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_edit_contacts]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_edit_relations]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_ground]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_inspect_interference]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_move]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.assembly_rigid_group]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_activate_setup]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_apply_template]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_compare_operations]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_create_machine]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_create_operation]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_create_setup]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_delete]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_edit_folders]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_edit_operation]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_edit_setup]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_edit_tools]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_generate]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_generate_setup_sheet]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_get_status]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_inspect_toolpaths]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_post]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_reorder]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_save_template]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_select_geometry]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_set_nc_comment]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.cam_show_toolpath]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_create_folder]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_create_project]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_delete_file]
+approval_mode = "prompt"
+
+[mcp_servers.fusion-essentials.tools.data_delete_folder]
+approval_mode = "prompt"
+
+[mcp_servers.fusion-essentials.tools.data_download_file]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_get_upload_status]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_move_file]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_switch_hub]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.data_upload_file]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_activate_component]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_add_instance]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_configure]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_delete_feature]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_delete_occurrence]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_edit_timeline]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_export]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_move_occurrence]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_recompute]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_remove_feature]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_set_mode]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.design_set_name]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_activate]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_close]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_copy]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_insert_derive]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_insert_import]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_insert_occurrence]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_new]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_open]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_restore_version]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_save]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_save_as]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_save_milestone]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.doc_update_xref]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_add_sketch]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_create]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_dimension]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_edit_sheet]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_export]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_insert_image]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.drawing_update]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.find_geometry]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_at_geometry]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_create]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_create_as_built]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_create_origin]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_drive]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_edit]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.joint_motion_link]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_combine]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_delete]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_export]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_generate_face_groups]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_insert]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_plane_cut]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_reduce]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_remesh]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_repair]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_reverse_normal]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_separate]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_shell]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_smooth]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.mesh_to_brep]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_arrange]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_base_feature]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_chamfer]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_combine]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_compute_holder]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_construction]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_create_component]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_draft]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_emboss]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_extrude]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_fillet]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_hole]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_inspect]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_loft]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_measure_between]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_measure_relation]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_mirror]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_move]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_offset_face]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_pattern_circular]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_pattern_path]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_pattern_rectangular]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_pipe]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_replace_face]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_revolve]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_scale]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_set_material]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_shell]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_split]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_stitch]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_sweep]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_thread]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.model_unstitch]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.param_add]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.param_delete]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.param_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.param_set]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.param_set_favorite]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.pmi_create]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.pmi_delete]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.pmi_edit]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.pmi_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.save_as_mesh]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_add_3d_line]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_add_geometry]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_constrain]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_copy]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_create]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_delete_entity]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_dimension]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_edit_curve]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_get]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_insert_svg]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_move]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_project]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sketch_set_text]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_create_ruled]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_delete_face]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_extend]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_extrude]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_fill]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_offset]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_patch]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_reverse_normal]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_revolve]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_thicken]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_trim]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.surface_untrim]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_capability_map]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_execute_script]
+approval_mode = "prompt"
+
+[mcp_servers.fusion-essentials.tools.sys_find_tool]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_get_api_doc]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_get_preferences]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_get_selection]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_reload_addin]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_request_selection]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.sys_set_preferences]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.view_list_workspaces]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.view_screenshot]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.view_screenshot_multi]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.view_section]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.view_set]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.view_switch_workspace]
+approval_mode = "approve"
+
+[mcp_servers.fusion-essentials.tools.workspace_orient]
+approval_mode = "approve"

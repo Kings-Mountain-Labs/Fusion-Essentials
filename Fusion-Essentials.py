@@ -1,5 +1,14 @@
 # Assuming you have not changed the general structure of the template no modification is needed in this file.
-from . import commands
+import os
+
+from .lib import loaded_attestation
+
+loaded_attestation.begin(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     'commands', 'mcpServer'))
+try:
+    from . import commands
+finally:
+    loaded_attestation.finish()
 from .lib import fusion360utils as futil
 
 

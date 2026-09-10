@@ -5,6 +5,7 @@ import os
 import adsk.core
 import os
 import platform
+import tempfile
 from . import config
 from .lib import fusion360utils as futil
 
@@ -64,8 +65,7 @@ def load_settings_init(module_id, module_name, default_settings, img_path):
                 all_settings[module_id]["img_path"] = DEFAULT_ICON
         merge_settings(default_settings, all_settings[module_id]["settings"])
 
-    with open(SETTINGS_FILE, 'w') as file:
-        json.dump(all_settings, file, indent=4)
+    _write_settings(all_settings)
 
 def save_settings(module_id, settings):
     all_settings = {}
@@ -75,8 +75,30 @@ def save_settings(module_id, settings):
 
     all_settings[module_id]["settings"] = settings
 
-    with open(SETTINGS_FILE, 'w') as file:
-        json.dump(all_settings, file, indent=4)
+    _write_settings(all_settings)
+
+def _write_settings(all_settings):
+    """Replace settings after the complete JSON is written and synced."""
+    serialized = json.dumps(all_settings, indent=4)
+    temp_fd, temp_path = tempfile.mkstemp(
+        prefix='.FusionEssentials-', suffix='.tmp', dir=os.path.dirname(SETTINGS_FILE))
+    try:
+        with os.fdopen(temp_fd, 'w', encoding='utf-8') as file:
+            temp_fd = None
+            file.write(serialized)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_path, SETTINGS_FILE)
+    except BaseException as failure:
+        for cleanup, value in ((os.close, temp_fd), (os.unlink, temp_path)):
+            if value is None:
+                continue
+            try:
+                cleanup(value)
+            except OSError as cleanup_error:
+                failure.add_note(f"Settings temporary cleanup failed for {temp_path}: "
+                                 f"{cleanup_error}")
+        raise
 
 def get_all_module_settings():
     if os.path.exists(SETTINGS_FILE):

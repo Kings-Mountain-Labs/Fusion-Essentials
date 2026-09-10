@@ -8,14 +8,21 @@ from .cleanChamfer import entry as cleanChamfer
 from .addHolder import entry as addHolder
 from .colorHoles import entry as colorHoles
 from .updateTools import entry as updateTools
+from .mcpServer import entry as mcpServer
 
 commands = [
     updateDocSettings,
     cleanChamfer,
     addHolder,
     colorHoles,
-    updateTools
+    updateTools,
+    mcpServer
 ]
+
+# Commands that must be opt-in (disabled by default). The MCP server hosts a
+# local HTTP server, so it stays off until the user explicitly enables it in the
+# Settings dialog. See commands/mcpServer/README.md for details.
+disabled_by_default = {mcpServer.CMD_ID}
 
 default_settings: dict = {}
 template_en = {
@@ -26,6 +33,7 @@ template_en = {
 for command in commands:
     default_settings[command.CMD_ID] = template_en.copy()
     default_settings[command.CMD_ID]["label"] += command.CMD_NAME
+    default_settings[command.CMD_ID]["default"] = command.CMD_ID not in disabled_by_default
 
 ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', 'settings', '')
 
